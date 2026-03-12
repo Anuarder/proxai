@@ -1,6 +1,8 @@
 # Proxai MVP Implementation Plan
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
+>
+> **Task completion rule:** When a task is done, update its task file: set `**Status:** Done` and change all `- [ ]` checkboxes to `- [x]`.
 
 **Goal:** Build a local Express server that proxies OpenAI-compatible API requests to Claude Code and Codex CLI tools, with session management and SQLite persistence, plus a minimal test UI.
 

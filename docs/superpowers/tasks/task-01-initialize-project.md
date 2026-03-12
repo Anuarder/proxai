@@ -2,7 +2,7 @@
 
 **Chunk:** 1 — Project Scaffolding + Config
 **Dependencies:** None
-**Status:** Not started
+**Status:** Done
 
 ## Description
 
@@ -16,22 +16,22 @@ Set up the Node.js/TypeScript project with all dependencies, build tooling, and 
 
 ## Acceptance Criteria
 
-- [ ] `npm install` runs without errors
-- [ ] `npx tsc --noEmit` succeeds (no type errors in empty project)
-- [ ] `package.json` has `"type": "module"` and scripts: `dev`, `build`, `start`, `test`, `test:watch`
-- [ ] `tsconfig.json` targets ES2022 with Node16 module resolution
-- [ ] `.gitignore` excludes `node_modules/`, `dist/`, `*.db`, `*.db-wal`, `*.db-shm`
-- [ ] Git repo initialized with initial commit
+- [x] `npm install` runs without errors
+- [x] `npx tsc --noEmit` succeeds (no type errors in empty project)
+- [x] `package.json` has `"type": "module"` and scripts: `dev`, `build`, `start`, `test`, `test:watch`
+- [x] `tsconfig.json` targets ES2022 with Node16 module resolution
+- [x] `.gitignore` excludes `node_modules/`, `dist/`, `*.db`, `*.db-wal`, `*.db-shm`
+- [x] Git repo initialized with initial commit
 
 ## Steps
 
-- [ ] 1. Run `npm init -y` in `/home/anuarder/Documents/Projects/proxai`
-- [ ] 2. Install runtime deps: `express`, `better-sqlite3`, `js-yaml`, `zod`, `uuid`
-- [ ] 3. Install dev deps: `typescript`, `@types/express`, `@types/better-sqlite3`, `@types/js-yaml`, `@types/uuid`, `@types/node`, `tsx`, `vitest`, `supertest`, `@types/supertest`
-- [ ] 4. Create `tsconfig.json` (ES2022, Node16, strict, outDir: dist, rootDir: src)
-- [ ] 5. Add `"type": "module"` and scripts to `package.json`
-- [ ] 6. Create `.gitignore`
-- [ ] 7. `git init && git add && git commit -m "chore: scaffold proxai project"`
+- [x] 1. Run `npm init -y` in `/home/anuarder/Documents/Projects/proxai`
+- [x] 2. Install runtime deps: `express`, `better-sqlite3`, `js-yaml`, `zod`, `uuid`
+- [x] 3. Install dev deps: `typescript`, `@types/express`, `@types/better-sqlite3`, `@types/js-yaml`, `@types/uuid`, `@types/node`, `tsx`, `vitest`, `supertest`, `@types/supertest`
+- [x] 4. Create `tsconfig.json` (ES2022, Node16, strict, outDir: dist, rootDir: src)
+- [x] 5. Add `"type": "module"` and scripts to `package.json`
+- [x] 6. Create `.gitignore`
+- [x] 7. `git init && git add && git commit -m "chore: scaffold proxai project"`
 
 ## Commit Message
 
