@@ -2,6 +2,8 @@
 
 16 tasks across 7 chunks. Full implementation code is in the [plan](../plans/2026-03-13-proxai-mvp.md).
 
+> **Task completion rule:** When a task is done, update its task file: set `**Status:** Done` and change all `- [ ]` checkboxes to `- [x]`.
+
 ## Dependency Graph
 
 ```
