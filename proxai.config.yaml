@@ -1,0 +1,20 @@
+server:
+  port: 3077
+  host: "127.0.0.1"
+
+auth:
+  bearer_token: "your-secret-key"
+
+sessions:
+  idle_timeout_ms: 300000
+  max_concurrent: 10
+
+providers:
+  claude:
+    command: "claude"
+    args: ["--print"]
+    model_id: "claude-code"
+  codex:
+    command: "codex"
+    args: []
+    model_id: "codex-cli"
