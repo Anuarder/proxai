@@ -2,7 +2,7 @@
 
 **Chunk:** 3 — Provider Adapter Interface + Implementations
 **Dependencies:** Task 1
-**Status:** Not started
+**Status:** Done
 
 ## Description
 
@@ -14,14 +14,14 @@ Define the `ProviderAdapter` interface and supporting types (`Message`, `SendRes
 
 ## Acceptance Criteria
 
-- [ ] `Message` type has `role` ("system" | "user" | "assistant") and `content` (string)
-- [ ] `SendResult` has `chunks` (AsyncIterable<string>) and `cliSessionId` (Promise<string | null>)
-- [ ] `ProviderAdapter` interface has: `name`, `modelId`, `send(prompt, cliSessionId)`, `kill(sessionId)`
-- [ ] File compiles without errors: `npx tsc --noEmit`
+- [x] `Message` type has `role` ("system" | "user" | "assistant") and `content` (string)
+- [x] `SendResult` has `chunks` (AsyncIterable<string>) and `cliSessionId` (Promise<string | null>)
+- [x] `ProviderAdapter` interface has: `name`, `modelId`, `send(prompt, cliSessionId)`, `kill(sessionId)`
+- [x] File compiles without errors: `npx tsc --noEmit`
 
 ## Steps
 
-- [ ] 1. Create `src/providers/adapter.ts` with types and interface
+- [x] 1. Create `src/providers/adapter.ts` with types and interface
 - [ ] 2. Commit
 
 ## Key Types
