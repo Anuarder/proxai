@@ -2,7 +2,7 @@
 
 **Chunk:** 3 — Provider Adapter Interface + Implementations
 **Dependencies:** Task 5
-**Status:** Not started
+**Status:** Done
 
 ## Description
 
@@ -15,22 +15,22 @@ Adapter for the Claude Code CLI. Spawns `claude -p` processes with `--output-for
 
 ## Acceptance Criteria
 
-- [ ] `adapter.name` is `"claude"`, `adapter.modelId` is `"claude-code"`
-- [ ] `send(prompt, null)` spawns `claude` with base args + prompt as last arg
-- [ ] `send(prompt, cliSessionId)` adds `--resume <cliSessionId>` before prompt
-- [ ] Streams text chunks from `stream_event` → `content_block_delta` → `text_delta` events
-- [ ] Captures CLI session ID from `result` event's `session_id` field
-- [ ] Returns `SendResult` with `chunks` (AsyncIterable) and `cliSessionId` (Promise)
-- [ ] `kill()` is a no-op (print-mode processes exit on their own)
-- [ ] All tests pass (with mocked child_process): `npx vitest run tests/providers/claude.test.ts`
+- [x] `adapter.name` is `"claude"`, `adapter.modelId` is `"claude-code"`
+- [x] `send(prompt, null)` spawns `claude` with base args + prompt as last arg
+- [x] `send(prompt, cliSessionId)` adds `--resume <cliSessionId>` before prompt
+- [x] Streams text chunks from `stream_event` → `content_block_delta` → `text_delta` events
+- [x] Captures CLI session ID from `result` event's `session_id` field
+- [x] Returns `SendResult` with `chunks` (AsyncIterable) and `cliSessionId` (Promise)
+- [x] `kill()` is a no-op (print-mode processes exit on their own)
+- [x] All tests pass (with mocked child_process): `npx vitest run tests/providers/claude.test.ts`
 
 ## Steps
 
-- [ ] 1. Write failing test with mocked `node:child_process` — 3 test cases
-- [ ] 2. Run test to verify it fails
-- [ ] 3. Implement `src/providers/claude.ts`
-- [ ] 4. Run test to verify it passes
-- [ ] 5. Commit
+- [x] 1. Write failing test with mocked `node:child_process` — 3 test cases
+- [x] 2. Run test to verify it fails
+- [x] 3. Implement `src/providers/claude.ts`
+- [x] 4. Run test to verify it passes
+- [x] 5. Commit
 
 ## Claude CLI Stream-JSON Format
 
