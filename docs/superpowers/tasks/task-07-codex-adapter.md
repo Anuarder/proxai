@@ -2,7 +2,7 @@
 
 **Chunk:** 3 — Provider Adapter Interface + Implementations
 **Dependencies:** Task 5
-**Status:** Not started
+**Status:** Done
 
 ## Description
 
@@ -15,20 +15,20 @@ Adapter for the Codex CLI. Spawns `codex exec --json` processes. Parses JSONL ou
 
 ## Acceptance Criteria
 
-- [ ] `adapter.name` is `"codex"`, `adapter.modelId` is `"codex-cli"`
-- [ ] `send(prompt, _)` spawns `codex` with base args + prompt as last arg
-- [ ] Captures session ID from `task_started` event
-- [ ] Streams text from `message` events where `role === "assistant"` and content blocks have `type: "output_text"`
-- [ ] `kill()` is a no-op (exec processes exit on their own)
-- [ ] All tests pass: `npx vitest run tests/providers/codex.test.ts`
+- [x] `adapter.name` is `"codex"`, `adapter.modelId` is `"codex-cli"`
+- [x] `send(prompt, _)` spawns `codex` with base args + prompt as last arg
+- [x] Captures session ID from `task_started` event
+- [x] Streams text from `message` events where `role === "assistant"` and content blocks have `type: "output_text"`
+- [x] `kill()` is a no-op (exec processes exit on their own)
+- [x] All tests pass: `npx vitest run tests/providers/codex.test.ts`
 
 ## Steps
 
-- [ ] 1. Write failing test with mocked `node:child_process` — 2 test cases
-- [ ] 2. Run test to verify it fails
-- [ ] 3. Implement `src/providers/codex.ts`
-- [ ] 4. Run test to verify it passes
-- [ ] 5. Commit
+- [x] 1. Write failing test with mocked `node:child_process` — 2 test cases
+- [x] 2. Run test to verify it fails
+- [x] 3. Implement `src/providers/codex.ts`
+- [x] 4. Run test to verify it passes
+- [x] 5. Commit
 
 ## Codex CLI JSONL Format
 
