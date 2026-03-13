@@ -2,7 +2,7 @@
 
 **Chunk:** 2 — SQLite Store + Session Manager
 **Dependencies:** Task 3
-**Status:** Not started
+**Status:** Done
 
 ## Description
 
@@ -15,21 +15,21 @@ Wraps `SessionStore` with session lifecycle logic: max concurrent session enforc
 
 ## Acceptance Criteria
 
-- [ ] `createSession()` enforces `max_concurrent` limit — throws when exceeded
-- [ ] `getSession()`, `listSessions()`, `touchSession()`, `deleteSession()` delegate to store
-- [ ] `updateStatus()`, `updateCliSessionId()`, `addMessage()`, `getMessages()` delegate to store
-- [ ] Idle checker runs on interval, marks sessions as "idle" when `last_active` exceeds timeout
-- [ ] `setOnIdleCallback(cb)` sets callback that fires when a session goes idle
-- [ ] `shutdown()` clears the idle checker interval
-- [ ] All tests pass: `npx vitest run tests/manager.test.ts`
+- [x] `createSession()` enforces `max_concurrent` limit — throws when exceeded
+- [x] `getSession()`, `listSessions()`, `touchSession()`, `deleteSession()` delegate to store
+- [x] `updateStatus()`, `updateCliSessionId()`, `addMessage()`, `getMessages()` delegate to store
+- [x] Idle checker runs on interval, marks sessions as "idle" when `last_active` exceeds timeout
+- [x] `setOnIdleCallback(cb)` sets callback that fires when a session goes idle
+- [x] `shutdown()` clears the idle checker interval
+- [x] All tests pass: `npx vitest run tests/manager.test.ts`
 
 ## Steps
 
-- [ ] 1. Write failing tests (`tests/manager.test.ts`) — 5 test cases including async idle callback
-- [ ] 2. Run test to verify it fails
-- [ ] 3. Implement `src/sessions/manager.ts`
-- [ ] 4. Run test to verify it passes
-- [ ] 5. Commit
+- [x] 1. Write failing tests (`tests/manager.test.ts`) — 5 test cases including async idle callback
+- [x] 2. Run test to verify it fails
+- [x] 3. Implement `src/sessions/manager.ts`
+- [x] 4. Run test to verify it passes
+- [x] 5. Commit
 
 ## Key Interface
 

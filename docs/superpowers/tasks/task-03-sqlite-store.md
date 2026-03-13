@@ -2,7 +2,7 @@
 
 **Chunk:** 2 — SQLite Store + Session Manager
 **Dependencies:** Task 1
-**Status:** Not started
+**Status:** Done
 
 ## Description
 
@@ -15,26 +15,26 @@ SQLite-backed persistence layer for sessions and messages. Uses `better-sqlite3`
 
 ## Acceptance Criteria
 
-- [ ] `SessionStore` creates tables on construction (sessions + messages)
-- [ ] `createSession(modelId, provider)` returns a `SessionRow` with UUID, status "active"
-- [ ] `getSession(id)` returns session or `null`
-- [ ] `listSessions()` returns all sessions ordered by `last_active` DESC
-- [ ] `updateSessionStatus(id, status)` updates status field
-- [ ] `updateCliSessionId(id, cliSessionId)` stores CLI-native session ID
-- [ ] `touchSession(id)` updates `last_active` timestamp
-- [ ] `deleteSession(id)` removes session AND cascades to delete messages (via `PRAGMA foreign_keys = ON`)
-- [ ] `addMessage(sessionId, role, content)` inserts message with timestamp
-- [ ] `getMessages(sessionId)` returns messages ordered by `id ASC`
-- [ ] `close()` closes the database connection
-- [ ] All tests pass with `:memory:` database: `npx vitest run tests/store.test.ts`
+- [x] `SessionStore` creates tables on construction (sessions + messages)
+- [x] `createSession(modelId, provider)` returns a `SessionRow` with UUID, status "active"
+- [x] `getSession(id)` returns session or `null`
+- [x] `listSessions()` returns all sessions ordered by `last_active` DESC
+- [x] `updateSessionStatus(id, status)` updates status field
+- [x] `updateCliSessionId(id, cliSessionId)` stores CLI-native session ID
+- [x] `touchSession(id)` updates `last_active` timestamp
+- [x] `deleteSession(id)` removes session AND cascades to delete messages (via `PRAGMA foreign_keys = ON`)
+- [x] `addMessage(sessionId, role, content)` inserts message with timestamp
+- [x] `getMessages(sessionId)` returns messages ordered by `id ASC`
+- [x] `close()` closes the database connection
+- [x] All tests pass with `:memory:` database: `npx vitest run tests/store.test.ts`
 
 ## Steps
 
-- [ ] 1. Write failing tests (`tests/store.test.ts`) — 7 test cases
-- [ ] 2. Run test to verify it fails
-- [ ] 3. Implement `src/sessions/store.ts`
-- [ ] 4. Run test to verify it passes
-- [ ] 5. Commit
+- [x] 1. Write failing tests (`tests/store.test.ts`) — 7 test cases
+- [x] 2. Run test to verify it fails
+- [x] 3. Implement `src/sessions/store.ts`
+- [x] 4. Run test to verify it passes
+- [x] 5. Commit
 
 ## Key Interfaces
 
