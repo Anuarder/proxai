@@ -33,7 +33,7 @@ export function createSessionsRoute(sessions: SessionManager): Router {
     res.json(list);
   });
 
-  router.get('/:id', (req: Request, res: Response) => {
+  router.get('/:id', (req: Request<{ id: string }>, res: Response) => {
     const session = sessions.getSession(req.params.id);
     if (!session) {
       res.status(404).json({ error: { message: 'Session not found' } });
@@ -44,7 +44,7 @@ export function createSessionsRoute(sessions: SessionManager): Router {
     res.json({ ...session, messages });
   });
 
-  router.delete('/:id', (req: Request, res: Response) => {
+  router.delete('/:id', (req: Request<{ id: string }>, res: Response) => {
     const session = sessions.getSession(req.params.id);
     if (!session) {
       res.status(404).json({ error: { message: 'Session not found' } });
