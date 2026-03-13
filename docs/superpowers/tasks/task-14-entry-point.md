@@ -2,7 +2,7 @@
 
 **Chunk:** 5 — Server Assembly + Entry Point
 **Dependencies:** Task 2, Task 13
-**Status:** Not started
+**Status:** Done
 
 ## Description
 
@@ -14,17 +14,17 @@ Application entry point. Loads config, creates server, starts listening, handles
 
 ## Acceptance Criteria
 
-- [ ] Loads config from `proxai.config.yaml`
-- [ ] Creates server and starts listening on configured host:port
-- [ ] Logs startup URL and test UI URL
-- [ ] Handles `SIGINT` and `SIGTERM` for graceful shutdown
-- [ ] Shutdown calls `manager.shutdown()`, `store.close()`, `server.close()`
-- [ ] `npx tsx src/index.ts` starts the server without errors
+- [x] Loads config from `proxai.config.yaml`
+- [x] Creates server and starts listening on configured host:port
+- [x] Logs startup URL and test UI URL
+- [x] Handles `SIGINT` and `SIGTERM` for graceful shutdown
+- [x] Shutdown calls `manager.shutdown()`, `store.close()`, `server.close()`
+- [x] `npx tsx src/index.ts` starts the server without errors
 
 ## Steps
 
-- [ ] 1. Implement `src/index.ts`
-- [ ] 2. Commit
+- [x] 1. Implement `src/index.ts`
+- [x] 2. Commit
 
 ## Commit Message
 
