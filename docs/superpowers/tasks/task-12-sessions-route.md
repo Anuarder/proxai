@@ -2,7 +2,7 @@
 
 **Chunk:** 4 — HTTP Layer (Auth, Routes, Server)
 **Dependencies:** Task 4
-**Status:** Not started
+**Status:** Done
 
 ## Description
 
@@ -15,23 +15,23 @@ Session management CRUD endpoints. Custom extension to the OpenAI API for managi
 
 ## Acceptance Criteria
 
-- [ ] `POST /v1/sessions` creates a session (201) with `{ model, provider }` body
-- [ ] `POST /v1/sessions` returns 400 if `model` or `provider` missing
-- [ ] `POST /v1/sessions` returns 429 if max concurrent reached
-- [ ] `GET /v1/sessions` lists all sessions (200)
-- [ ] `GET /v1/sessions/:id` returns session with messages (200)
-- [ ] `GET /v1/sessions/:id` returns 404 for missing session
-- [ ] `DELETE /v1/sessions/:id` deletes session (204)
-- [ ] `DELETE /v1/sessions/:id` returns 404 for missing session
-- [ ] All tests pass: `npx vitest run tests/routes/sessions.test.ts`
+- [x] `POST /v1/sessions` creates a session (201) with `{ model, provider }` body
+- [x] `POST /v1/sessions` returns 400 if `model` or `provider` missing
+- [x] `POST /v1/sessions` returns 429 if max concurrent reached
+- [x] `GET /v1/sessions` lists all sessions (200)
+- [x] `GET /v1/sessions/:id` returns session with messages (200)
+- [x] `GET /v1/sessions/:id` returns 404 for missing session
+- [x] `DELETE /v1/sessions/:id` deletes session (204)
+- [x] `DELETE /v1/sessions/:id` returns 404 for missing session
+- [x] All tests pass: `npx vitest run tests/routes/sessions.test.ts`
 
 ## Steps
 
-- [ ] 1. Write failing tests (`tests/routes/sessions.test.ts`) — 5 test cases
-- [ ] 2. Run test to verify it fails
-- [ ] 3. Implement `src/routes/sessions.ts`
-- [ ] 4. Run test to verify it passes
-- [ ] 5. Commit
+- [x] 1. Write failing tests (`tests/routes/sessions.test.ts`) — 5 test cases
+- [x] 2. Run test to verify it fails
+- [x] 3. Implement `src/routes/sessions.ts`
+- [x] 4. Run test to verify it passes
+- [x] 5. Commit
 
 ## Endpoints
 
