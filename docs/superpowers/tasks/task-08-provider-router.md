@@ -2,7 +2,7 @@
 
 **Chunk:** 3 — Provider Adapter Interface + Implementations
 **Dependencies:** Task 6, Task 7
-**Status:** Not started
+**Status:** Done
 
 ## Description
 
@@ -14,16 +14,16 @@ Maps model names (from config) to their corresponding adapter instances. Provide
 
 ## Acceptance Criteria
 
-- [ ] Reads `config.providers` and instantiates the correct adapter for each known provider
-- [ ] Warns and skips unknown provider names
-- [ ] `getAdapter(modelId)` returns the adapter or `undefined`
-- [ ] `listModels()` returns `Array<{ id: string; name: string }>`
-- [ ] `killSession(sessionId)` calls `kill()` on all adapters
-- [ ] File compiles without errors
+- [x] Reads `config.providers` and instantiates the correct adapter for each known provider
+- [x] Warns and skips unknown provider names
+- [x] `getAdapter(modelId)` returns the adapter or `undefined`
+- [x] `listModels()` returns `Array<{ id: string; name: string }>`
+- [x] `killSession(sessionId)` calls `kill()` on all adapters
+- [x] File compiles without errors
 
 ## Steps
 
-- [ ] 1. Implement `src/providers/router.ts`
+- [x] 1. Implement `src/providers/router.ts`
 - [ ] 2. Commit
 
 ## Notes
