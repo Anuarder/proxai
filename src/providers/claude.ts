@@ -20,7 +20,10 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
 
     args.push(prompt);
 
-    const proc = spawn('claude', args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    const env = { ...process.env };
+    delete env.CLAUDECODE;
+
+    const proc = spawn('claude', args, { stdio: ['ignore', 'pipe', 'pipe'], env });
 
     let resolveSessionId: (id: string | null) => void;
     const sessionIdPromise = new Promise<string | null>((resolve) => {

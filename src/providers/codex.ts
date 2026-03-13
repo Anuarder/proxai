@@ -9,7 +9,10 @@ export class CodexAdapter implements ProviderAdapter {
   send(prompt: string, _cliSessionId: string | null): SendResult {
     const args = ['exec', '--json', prompt];
 
-    const proc = spawn('codex', args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    const env = { ...process.env };
+    delete env.CLAUDECODE;
+
+    const proc = spawn('codex', args, { stdio: ['ignore', 'pipe', 'pipe'], env });
 
     let resolveSessionId: (id: string | null) => void;
     const sessionIdPromise = new Promise<string | null>((resolve) => {
@@ -27,22 +30,18 @@ export class CodexAdapter implements ProviderAdapter {
       rl.on('line', (line) => {
         try {
           const parsed = JSON.parse(line);
-          if (parsed.type === 'task_started' && parsed.session_id) {
+          if (parsed.type === 'thread.started' && parsed.thread_id) {
             sessionIdResolved = true;
-            resolveSessionId(parsed.session_id);
+            resolveSessionId(parsed.thread_id);
             return;
           }
           if (
-            parsed.type === 'message' &&
-            parsed.role === 'assistant' &&
-            Array.isArray(parsed.content)
+            parsed.type === 'item.completed' &&
+            parsed.item?.type === 'agent_message' &&
+            parsed.item?.text
           ) {
-            for (const block of parsed.content) {
-              if (block.type === 'output_text' && block.text) {
-                queue.push(block.text);
-              }
-            }
-            if (waiting && queue.length > 0) {
+            queue.push(parsed.item.text);
+            if (waiting) {
               const resume = waiting;
               waiting = null;
               resume();

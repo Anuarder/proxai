@@ -68,7 +68,7 @@ export class SessionManager {
       for (const session of sessions) {
         if (session.status !== 'active') continue;
         const lastActive = new Date(session.last_active).getTime();
-        if (now - lastActive > this.config.idle_timeout_ms) {
+        if (now - lastActive >= this.config.idle_timeout_ms) {
           this.store.updateSessionStatus(session.id, 'idle');
           if (this.onIdle) {
             this.onIdle(session.id);

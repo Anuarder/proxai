@@ -39,13 +39,13 @@ describe('CodexAdapter', () => {
     expect(adapter.modelId).toBe('codex-cli');
   });
 
-  it('streams text from message events and captures session id', async () => {
+  it('streams text from item.completed events and captures thread id', async () => {
     const { spawn } = await import('node:child_process');
     const mockSpawn = vi.mocked(spawn);
 
     const lines = [
-      '{"type":"task_started","session_id":"codex-session-456"}',
-      '{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Hello from Codex"}]}',
+      '{"type":"thread.started","thread_id":"codex-thread-456"}',
+      '{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"Hello from Codex"}}',
     ];
     mockSpawn.mockReturnValue(createMockProcess(lines));
 
@@ -56,7 +56,7 @@ describe('CodexAdapter', () => {
     }
 
     expect(chunks).toEqual(['Hello from Codex']);
-    expect(await result.cliSessionId).toBe('codex-session-456');
+    expect(await result.cliSessionId).toBe('codex-thread-456');
 
     expect(mockSpawn).toHaveBeenCalledWith(
       'codex',
@@ -70,8 +70,8 @@ describe('CodexAdapter', () => {
     const mockSpawn = vi.mocked(spawn);
 
     const lines = [
-      '{"type":"task_started","session_id":"codex-session-789"}',
-      '{"type":"message","role":"assistant","content":[{"type":"output_text","text":"response"}]}',
+      '{"type":"thread.started","thread_id":"codex-thread-789"}',
+      '{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"response"}}',
     ];
     mockSpawn.mockReturnValue(createMockProcess(lines));
 
@@ -91,12 +91,12 @@ describe('CodexAdapter', () => {
     );
   });
 
-  it('resolves cliSessionId to null when no task_started event', async () => {
+  it('resolves cliSessionId to null when no thread.started event', async () => {
     const { spawn } = await import('node:child_process');
     const mockSpawn = vi.mocked(spawn);
 
     const lines = [
-      '{"type":"message","role":"assistant","content":[{"type":"output_text","text":"data"}]}',
+      '{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"data"}}',
       'not json',
     ];
     mockSpawn.mockReturnValue(createMockProcess(lines));
