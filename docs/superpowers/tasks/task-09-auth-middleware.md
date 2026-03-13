@@ -2,7 +2,7 @@
 
 **Chunk:** 4 — HTTP Layer (Auth, Routes, Server)
 **Dependencies:** Task 1
-**Status:** Not started
+**Status:** Done
 
 ## Description
 
@@ -15,19 +15,19 @@ Express middleware that validates `Authorization: Bearer <token>` header against
 
 ## Acceptance Criteria
 
-- [ ] Allows requests with valid `Bearer <token>` header (200)
-- [ ] Rejects requests without `Authorization` header (401, `"Missing Authorization header"`)
-- [ ] Rejects requests with wrong token (401, `"Invalid API key"`)
-- [ ] Returns OpenAI-style error format: `{ error: { message, type: "auth_error" } }`
-- [ ] All tests pass: `npx vitest run tests/auth.test.ts`
+- [x] Allows requests with valid `Bearer <token>` header (200)
+- [x] Rejects requests without `Authorization` header (401, `"Missing Authorization header"`)
+- [x] Rejects requests with wrong token (401, `"Invalid API key"`)
+- [x] Returns OpenAI-style error format: `{ error: { message, type: "auth_error" } }`
+- [x] All tests pass: `npx vitest run tests/auth.test.ts`
 
 ## Steps
 
-- [ ] 1. Write failing test (`tests/auth.test.ts`) — 3 test cases using `supertest`
-- [ ] 2. Run test to verify it fails
-- [ ] 3. Implement `src/middleware/auth.ts`
-- [ ] 4. Run test to verify it passes
-- [ ] 5. Commit
+- [x] 1. Write failing test (`tests/auth.test.ts`) — 3 test cases using `supertest`
+- [x] 2. Run test to verify it fails
+- [x] 3. Implement `src/middleware/auth.ts`
+- [x] 4. Run test to verify it passes
+- [x] 5. Commit
 
 ## Commit Message
 
