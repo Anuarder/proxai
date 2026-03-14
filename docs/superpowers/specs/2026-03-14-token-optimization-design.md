@@ -107,6 +107,12 @@ providers:
 Updated `ProviderAdapter` interface:
 
 ```typescript
+interface ProviderConfig {
+  command: string;
+  args: string[];
+  modelFlag: string;       // e.g., "--model" or "-m"
+}
+
 interface ProviderAdapter {
   readonly name: string;
   send(prompt: string, cliSessionId: string | null, cliModel: string): SendResult;
@@ -114,10 +120,13 @@ interface ProviderAdapter {
 }
 ```
 
+- Adapters receive `ProviderConfig` in their constructor (command, args, modelFlag from YAML config)
 - The `modelId` property is removed from the adapter interface — adapters no longer own a single model
-- `send()` receives `cliModel` per-call and appends the appropriate flag (`--model` for Claude, `-m` for Codex)
+- `send()` receives `cliModel` per-call and appends `[modelFlag, cliModel]` to spawn args
+- Streaming/output-format flags (`--output-format stream-json`, `--verbose`, etc.) move into the config `args` array instead of being hardcoded in adapters
 - One adapter instance per provider (not per model)
-- `ProviderRouter` maps each model ID to `{ adapter, cliModel }` pairs
+- `ProviderRouter` instantiates adapters with config: `new ClaudeAdapter(providerConfig)` and maps each model ID to `{ adapter, cliModel }` pairs
+- `getAdapter(modelId)` returns `{ adapter: ProviderAdapter, cliModel: string } | undefined`
 - `listModels()` returns all model IDs across all providers
 
 ### Prompt Assembly
@@ -168,7 +177,7 @@ Tiers can mix providers for best value. Fully customizable by the user.
 
 ### Summarization Call Flow
 
-1. Context module calls `router.getAdapter(routing.tiers.trivial)` to get the cheapest model
+1. Context module calls `router.getAdapter(routing.tiers.trivial)` which returns `{ adapter, cliModel }` for the cheapest model
 2. Builds a summarization prompt: "Summarize this conversation concisely, preserving key decisions, code snippets, and context: [older messages]"
 3. Calls `adapter.send(summaryPrompt, null, cliModel)` — a standalone call, no session resume
 4. Collects all chunks into a summary string
@@ -199,7 +208,7 @@ New SQLite table `request_logs`:
 |--------|------|-------------|
 | id | TEXT (UUID) | Primary key |
 | session_id | TEXT | References sessions (no FK constraint — logs persist after session deletion for analytics) |
-| timestamp | INTEGER | Unix ms |
+| timestamp | TEXT | ISO 8601 string (consistent with existing `messages` table) |
 | model_requested | TEXT | What client asked for (or "auto") |
 | model_used | TEXT | What was actually used |
 | tier | TEXT | Classifier result |
@@ -257,7 +266,7 @@ All stats routes require the same bearer token auth as other endpoints. Stats en
 | `src/providers/codex.ts` | Append `-m <cliModel>` to spawn args |
 | `src/providers/router.ts` | Map model IDs to `{ adapter, cliModel }`, tier-based lookup |
 | `src/routes/completions.ts` | Integrate classifier, log routing decisions, context handoff |
-| `src/sessions/store.ts` | New `request_logs` table, `summary` column on sessions |
+| `src/sessions/store.ts` | New `request_logs` table, `summary` and `last_model_used` columns on sessions (use `ALTER TABLE ADD COLUMN` — SQLite supports this; wrap in try/catch to handle already-existing columns on re-runs) |
 | `src/server.ts` | Register stats routes |
 | `proxai.config.yaml` | Updated with multi-model and routing config |
 
@@ -266,8 +275,9 @@ All stats routes require the same bearer token auth as other endpoints. Stats en
 ## 6. Migration & Backwards Compatibility
 
 - Existing single-`model_id` config format still works — Zod schema accepts it as sugar for a single-model `models` array. If both `model_id` and `models` are present, validation errors.
-- New `routing` and `context` sections are optional with sensible defaults
+- New `routing` and `context` sections are optional. Defaults: `routing.default_model` = first model ID from the first provider; all tiers map to `default_model` (no auto-routing until configured). `context` defaults shown in Section 3.
 - `model: "auto"` is new; existing clients sending specific model IDs work unchanged
+- When `model: "auto"`, the session's `model_id` is stored as the *resolved* model ID (e.g., `"claude-haiku"`), not `"auto"`. The session tracks `last_model_used` so the completions route can detect cross-model handoffs on subsequent requests within the same session.
 - `request_logs` table is created on startup if it doesn't exist (same pattern as existing tables)
 
 ---
