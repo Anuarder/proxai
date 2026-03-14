@@ -45,6 +45,14 @@ interface ClassifyResult {
 
 Signals are weighted and summed to produce a tier. Thresholds are configurable.
 
+### Token Estimation
+
+CLI providers don't return token counts. Use a character-based heuristic: `Math.ceil(text.length / 4)`. This is rough but sufficient for classification and logging. Can be replaced with a tokenizer library (e.g., `tiktoken`) later if precision matters.
+
+### Confidence & Fallback
+
+In v1, `confidence` is logged for analytics only. If the classifier can't determine a tier (e.g., all signals conflict), it defaults to `routing.default_model`. Future versions may add a `min_confidence` threshold to trigger LLM-based classification.
+
 ### Routing Behavior
 
 - `model: "auto"` — classifier picks the tier, router maps tier → model
@@ -60,13 +68,14 @@ Both Claude CLI (`--model <model>`) and Codex CLI (`-m <model>`) support per-req
 
 ### Config Changes
 
-The `providers` section changes from a single `model_id` to a `models` list:
+The `providers` section changes from a single `model_id` to a `models` list. Adapters now use the `command` and `args` from config (instead of hardcoding):
 
 ```yaml
 providers:
   claude:
     command: "claude"
     args: ["--print"]
+    model_flag: "--model"     # CLI flag for model selection
     models:
       - id: "claude-haiku"
         cli_model: "haiku"
@@ -80,6 +89,7 @@ providers:
   codex:
     command: "codex"
     args: []
+    model_flag: "-m"          # CLI flag for model selection
     models:
       - id: "codex-5-mini"
         cli_model: "gpt-5-codex-mini"
@@ -92,11 +102,32 @@ providers:
         tier: "complex"
 ```
 
-### Adapter Changes
+### Adapter Interface Changes
 
-- `ProviderAdapter.send()` receives the `cli_model` string and appends the appropriate flag (`--model` for Claude, `-m` for Codex) to spawn args
-- Each adapter exposes multiple model IDs instead of one
-- `ProviderRouter` maps model IDs to `{ adapter, cliModel }` pairs
+Updated `ProviderAdapter` interface:
+
+```typescript
+interface ProviderAdapter {
+  readonly name: string;
+  send(prompt: string, cliSessionId: string | null, cliModel: string): SendResult;
+  kill(sessionId: string): Promise<void>;
+}
+```
+
+- The `modelId` property is removed from the adapter interface — adapters no longer own a single model
+- `send()` receives `cliModel` per-call and appends the appropriate flag (`--model` for Claude, `-m` for Codex)
+- One adapter instance per provider (not per model)
+- `ProviderRouter` maps each model ID to `{ adapter, cliModel }` pairs
+- `listModels()` returns all model IDs across all providers
+
+### Prompt Assembly
+
+When `send()` is called, the `prompt` parameter contains the fully assembled context string. The completions route is responsible for building this:
+
+- **Same model, has CLI session** → just the new user message (CLI handles history via `--resume`)
+- **Cross-model or no CLI session** → assembled by `src/context.ts`: `[summary (if any)] + [recent messages formatted as text] + [new prompt]`
+
+The adapter treats `prompt` as an opaque string — it never knows whether it contains assembled context or a single message.
 
 ### Tier Routing Config
 
@@ -112,6 +143,8 @@ routing:
 
 Tiers can mix providers for best value. Fully customizable by the user.
 
+**Note:** The `tier` field on individual models in the `providers` config is informational only (used by `GET /v1/models` to show each model's intended tier). Actual routing is controlled exclusively by the `routing.tiers` map. If a tier has no model mapped, `default_model` is used as fallback.
+
 ---
 
 ## 3. Context Management
@@ -124,15 +157,27 @@ Tiers can mix providers for best value. Fully customizable by the user.
 
 **Cross-model handoff** (switching models mid-conversation):
 - Proxai pulls message history from SQLite
-- If history is small (< `max_messages_before_summary` messages): send all messages as context
-- If history is large: generate summary + send last `recent_window_size` messages
+- If history is small (< `max_messages_before_summary` user+assistant messages): send all messages as context
+- If history is large: use existing summary (or generate one) + send last `recent_window_size` messages
+- **Important:** Cross-model handoff is context-degraded. The new model only receives message text history, not CLI-internal state (tool results, file state, working directory context). The CLI session ID is not transferable between models. A new CLI session starts for the new model.
 
 **Summarization engine:**
 - New module: `src/context.ts`
-- Triggered when message count exceeds `max_messages_before_summary`
-- Uses the cheapest available model to generate a summary of older messages
-- Summary stored in SQLite alongside the session (`sessions.summary` column)
-- New requests get: `[summary] + [last N messages] + [new prompt]`
+- Triggered when user+assistant message count exceeds `max_messages_before_summary` (system messages excluded from count)
+- Skipped if total messages are fewer than `recent_window_size` (nothing to summarize)
+
+### Summarization Call Flow
+
+1. Context module calls `router.getAdapter(routing.tiers.trivial)` to get the cheapest model
+2. Builds a summarization prompt: "Summarize this conversation concisely, preserving key decisions, code snippets, and context: [older messages]"
+3. Calls `adapter.send(summaryPrompt, null, cliModel)` — a standalone call, no session resume
+4. Collects all chunks into a summary string
+5. Stores summary in SQLite (`sessions.summary` column)
+6. Summary requests are logged in `request_logs` with `model_requested: "internal:summarize"`
+
+**Error handling:** If summarization fails (model unavailable, timeout, error), fall back to truncated recent history only (last `recent_window_size` messages without summary). Log the failure but don't block the user's request.
+
+**Latency:** Summarization runs synchronously before the user's request is forwarded. For v1 this is acceptable since it only triggers on cross-model handoff with long history. Future optimization: pre-compute summaries in the background after every N messages.
 
 ### Config
 
@@ -153,7 +198,7 @@ New SQLite table `request_logs`:
 | Column | Type | Description |
 |--------|------|-------------|
 | id | TEXT (UUID) | Primary key |
-| session_id | TEXT | FK to sessions |
+| session_id | TEXT | References sessions (no FK constraint — logs persist after session deletion for analytics) |
 | timestamp | INTEGER | Unix ms |
 | model_requested | TEXT | What client asked for (or "auto") |
 | model_used | TEXT | What was actually used |
@@ -188,6 +233,8 @@ New routes in `src/routes/stats.ts`:
 - **`GET /v1/stats/models`** — per-model stats:
   - Total tokens, request count, avg latency, tier distribution
 
+All stats routes require the same bearer token auth as other endpoints. Stats endpoints accept optional `?from=<unix_ms>&to=<unix_ms>` query params for time-range filtering to keep queries fast on large datasets.
+
 ---
 
 ## 5. Files to Create / Modify
@@ -218,7 +265,7 @@ New routes in `src/routes/stats.ts`:
 
 ## 6. Migration & Backwards Compatibility
 
-- Existing single-`model_id` config format should still work (treated as a single-model provider)
+- Existing single-`model_id` config format still works — Zod schema accepts it as sugar for a single-model `models` array. If both `model_id` and `models` are present, validation errors.
 - New `routing` and `context` sections are optional with sensible defaults
 - `model: "auto"` is new; existing clients sending specific model IDs work unchanged
 - `request_logs` table is created on startup if it doesn't exist (same pattern as existing tables)
