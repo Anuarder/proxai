@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { mapClaudeStream } from '../../src/providers/claude.js';
+import { mapClaudeStream, buildClaudeArgs } from '../../src/providers/claude.js';
 import type { ProxaiEvent } from '../../src/events/schema.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -44,5 +44,37 @@ describe('mapClaudeStream', () => {
     expect(textDeltas.length).toBeGreaterThan(0);
     const concatText = textDeltas.map((e) => e.type === 'text_delta' ? e.text : '').join('');
     expect(concatText).toContain('done');
+  });
+});
+
+describe('buildClaudeArgs', () => {
+  it('produces the v1 arg list (no --model) when cliModel is null', () => {
+    const args = buildClaudeArgs('PROMPT', {
+      systemPrompt: null,
+      allowedTools: null,
+      mcpConfigFile: null,
+    }, null);
+    expect(args).toEqual([
+      '-p',
+      '--output-format', 'stream-json',
+      '--verbose',
+      '--include-partial-messages',
+      'PROMPT',
+    ]);
+  });
+
+  it('includes allowedTools, mcp config, and system prompt flags', () => {
+    const args = buildClaudeArgs('PROMPT', {
+      systemPrompt: 'be nice',
+      allowedTools: ['WebSearch', 'WebFetch'],
+      mcpConfigFile: './ask-mcp.json',
+    }, null);
+    expect(args).toContain('--allowedTools');
+    expect(args[args.indexOf('--allowedTools') + 1]).toBe('WebSearch,WebFetch');
+    expect(args).toContain('--mcp-config');
+    expect(args[args.indexOf('--mcp-config') + 1]).toBe('./ask-mcp.json');
+    expect(args).toContain('--append-system-prompt');
+    expect(args[args.indexOf('--append-system-prompt') + 1]).toBe('be nice');
+    expect(args[args.length - 1]).toBe('PROMPT');
   });
 });

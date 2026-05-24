@@ -84,6 +84,20 @@ function randomId(): string {
   return 'req_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
+export function buildClaudeArgs(
+  prompt: string,
+  modeConfig: ModeConfig,
+  cliModel: string | null,
+): string[] {
+  const args = ['-p', '--output-format', 'stream-json', '--verbose', '--include-partial-messages'];
+  if (modeConfig.allowedTools) args.push('--allowedTools', modeConfig.allowedTools.join(','));
+  if (modeConfig.mcpConfigFile) args.push('--mcp-config', modeConfig.mcpConfigFile);
+  if (modeConfig.systemPrompt) args.push('--append-system-prompt', modeConfig.systemPrompt);
+  if (cliModel) args.push('--model', cliModel);
+  args.push(prompt);
+  return args;
+}
+
 export class ClaudeCodeAdapter implements ProviderAdapter {
   readonly name = 'claude';
   readonly modelId = 'claude-code';
@@ -91,11 +105,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
 
   send(messages: Message[], modeConfig: ModeConfig, signal: AbortSignal): SendResult {
     const prompt = assemblePrompt(messages);
-    const args = ['-p', '--output-format', 'stream-json', '--verbose', '--include-partial-messages'];
-    if (modeConfig.allowedTools) args.push('--allowedTools', modeConfig.allowedTools.join(','));
-    if (modeConfig.mcpConfigFile) args.push('--mcp-config', modeConfig.mcpConfigFile);
-    if (modeConfig.systemPrompt) args.push('--append-system-prompt', modeConfig.systemPrompt);
-    args.push(prompt);
+    const args = buildClaudeArgs(prompt, modeConfig, null);
 
     const env = { ...process.env };
     delete env.CLAUDECODE;
