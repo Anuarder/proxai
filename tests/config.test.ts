@@ -88,3 +88,64 @@ describe('loadConfig', () => {
     fs.rmSync(tmp, { recursive: true });
   });
 });
+
+const validYamlWithModels = `
+server:
+  port: 3077
+  host: "127.0.0.1"
+auth:
+  ask_token: "ask-secret"
+  agent_token: "agent-secret"
+modes:
+  ask:
+    system_prompt: "x"
+    allowed_tools: ["WebSearch"]
+    mcp_config_file: null
+  agent:
+    system_prompt: null
+    allowed_tools: null
+    mcp_config_file: null
+providers:
+  claude:
+    command: "claude"
+    model_id: "claude-code"
+    default_model: "claude-sonnet"
+    models:
+      - id: "claude-opus"
+        cli_model: "opus"
+      - id: "claude-sonnet"
+        cli_model: "sonnet"
+      - id: "claude-haiku"
+        cli_model: "haiku"
+  codex:
+    command: "codex"
+    model_id: "codex-cli"
+`;
+
+describe('parseConfig (model selection)', () => {
+  it('parses providers.models[] with id + cli_model', () => {
+    const c = parseConfig(validYamlWithModels);
+    expect(c.providers['claude'].models).toEqual([
+      { id: 'claude-opus', cli_model: 'opus' },
+      { id: 'claude-sonnet', cli_model: 'sonnet' },
+      { id: 'claude-haiku', cli_model: 'haiku' },
+    ]);
+    expect(c.providers['claude'].default_model).toBe('claude-sonnet');
+  });
+
+  it('absent models[] is still valid (back-compat)', () => {
+    const c = parseConfig(validYaml);
+    expect(c.providers['claude'].models).toBeUndefined();
+    expect(c.providers['claude'].default_model).toBeUndefined();
+  });
+
+  it('rejects duplicate id across providers', () => {
+    const dup = validYamlWithModels.replace('id: "claude-opus"', 'id: "codex-cli"');
+    expect(() => parseConfig(dup)).toThrow(/duplicate model id/i);
+  });
+
+  it('rejects default_model that does not match any models[i].id', () => {
+    const bad = validYamlWithModels.replace('default_model: "claude-sonnet"', 'default_model: "claude-bogus"');
+    expect(() => parseConfig(bad)).toThrow(/default_model/i);
+  });
+});
