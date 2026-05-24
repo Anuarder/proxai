@@ -14,6 +14,8 @@ import { AUTH_PATTERNS, detectAuthPattern, checkBinary } from './probe.js';
 //   - systemPrompt  → likely `--instructions <text>` or `--system <text>`
 //   - allowedTools  → likely `--sandbox` + a tools-allowlist flag (unknown name)
 //   - mcpConfigFile → likely `--mcp-config <path>`
+//   - cliModel      → plumbed through send() signature but not yet activated;
+//                     the `--model` flag name for codex CLI is unverified.
 
 export interface CodexMapMeta { requestId: string; model: string; provider: string; }
 
@@ -66,7 +68,7 @@ export class CodexAdapter implements ProviderAdapter {
   readonly modelId = 'codex-cli';
   constructor(private readonly registry: import('../lifecycle/children.js').ChildRegistry) {}
 
-  send(messages: Message[], modeConfig: ModeConfig, signal: AbortSignal): SendResult {
+  send(messages: Message[], modeConfig: ModeConfig, signal: AbortSignal, _cliModel: string | null = null): SendResult {
     // Codex flag surface for tool whitelisting / MCP config / system prompt is not yet verified
     // (see Task 9 discovery note above). To honour the spec's fail-closed guarantee for ask
     // mode, refuse to spawn the process when modeConfig requests restrictions we cannot enforce.

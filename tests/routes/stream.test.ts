@@ -44,6 +44,51 @@ describe('POST /v1/chat/stream', () => {
     expect(res.text).toContain('event: done');
   });
 
+  it('does not abort the adapter as soon as the request body is consumed', async () => {
+    // Regression: in Node 18+/Express 5, `req.on('close')` fires after
+    // express.json finishes consuming the body, before any streaming starts.
+    // The route must hook `res.on('close')` instead, otherwise the adapter is
+    // aborted before it emits any events and the response is empty.
+    let abortedEarly = false;
+    const adapter: ProviderAdapter = {
+      name: 'claude',
+      modelId: 'claude-code',
+      async probe() { return { status: 'ready' as const }; },
+      send(_msgs, _mode, signal, _cliModel) {
+        async function* events(): AsyncGenerator<ProxaiEvent> {
+          // Pause so any pre-stream abort has time to fire.
+          await new Promise((r) => setTimeout(r, 50));
+          if (signal.aborted) {
+            abortedEarly = true;
+            yield { type: 'done' };
+            return;
+          }
+          yield { type: 'start', request_id: 'r', model: 'claude-code', provider: 'claude' };
+          yield { type: 'text_delta', text: 'hi' };
+          yield { type: 'done' };
+        }
+        return { events: events() };
+      },
+    };
+    const app = express();
+    app.use(express.json());
+    const route = createStreamRoute({
+      getAdapter: () => adapter,
+      resolveModeConfig: () => ({ systemPrompt: null, allowedTools: null, mcpConfigFile: null }),
+      timeouts: { request_timeout_ms: 5000, idle_timeout_ms: 5000, probe_timeout_ms: 1000, process_kill_grace_ms: 100 },
+    });
+    app.post('/v1/chat/stream', (req, _res, next) => { (req as any).mode = 'agent'; next(); }, route);
+
+    const res = await request(app)
+      .post('/v1/chat/stream')
+      .send({ model: 'claude-code', mode: 'agent', messages: [{ role: 'user', content: 'hi' }] });
+
+    expect(res.status).toBe(200);
+    expect(abortedEarly).toBe(false);
+    expect(res.text).toContain('event: start');
+    expect(res.text).toContain('event: text_delta');
+  });
+
   it('returns 400 on unknown model', async () => {
     const app = express();
     app.use(express.json());

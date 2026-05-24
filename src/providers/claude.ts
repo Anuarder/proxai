@@ -103,9 +103,9 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
   readonly modelId = 'claude-code';
   constructor(private readonly registry: import('../lifecycle/children.js').ChildRegistry) {}
 
-  send(messages: Message[], modeConfig: ModeConfig, signal: AbortSignal): SendResult {
+  send(messages: Message[], modeConfig: ModeConfig, signal: AbortSignal, cliModel: string | null = null): SendResult {
     const prompt = assemblePrompt(messages);
-    const args = buildClaudeArgs(prompt, modeConfig, null);
+    const args = buildClaudeArgs(prompt, modeConfig, cliModel);
 
     const env = { ...process.env };
     delete env.CLAUDECODE;

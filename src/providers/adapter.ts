@@ -16,6 +16,11 @@ export type ProbeResult =
 export interface ProviderAdapter {
   readonly name: string;
   readonly modelId: string;
-  send(messages: import('./prompt.js').Message[], modeConfig: ModeConfig, signal: AbortSignal): SendResult;
+  send(
+    messages: import('./prompt.js').Message[],
+    modeConfig: ModeConfig,
+    signal: AbortSignal,
+    cliModel?: string | null,
+  ): SendResult;
   probe(timeoutMs: number): Promise<ProbeResult>;
 }

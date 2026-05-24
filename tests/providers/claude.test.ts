@@ -78,3 +78,26 @@ describe('buildClaudeArgs', () => {
     expect(args[args.length - 1]).toBe('PROMPT');
   });
 });
+
+describe('buildClaudeArgs with cliModel', () => {
+  it('appends --model <cliModel> when set', () => {
+    const args = buildClaudeArgs('PROMPT', {
+      systemPrompt: null,
+      allowedTools: null,
+      mcpConfigFile: null,
+    }, 'opus');
+    const idx = args.indexOf('--model');
+    expect(idx).toBeGreaterThanOrEqual(0);
+    expect(args[idx + 1]).toBe('opus');
+    expect(args[args.length - 1]).toBe('PROMPT');
+  });
+
+  it('omits --model when cliModel is empty string', () => {
+    const args = buildClaudeArgs('PROMPT', {
+      systemPrompt: null,
+      allowedTools: null,
+      mcpConfigFile: null,
+    }, '');
+    expect(args).not.toContain('--model');
+  });
+});
