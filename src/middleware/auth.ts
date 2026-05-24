@@ -19,7 +19,7 @@ export function createAuthMiddleware(authCfg: AuthConfig) {
       res.status(401).json({ error: { message: 'Missing Authorization header', code: 'unauthenticated' } });
       return;
     }
-    const bearer = header.replace(/^Bearer\s+/, '');
+    const bearer = header.replace(/^Bearer\s+/i, '').trim();
     const scopes = new Set<ModeName>();
     if (bearer === authCfg.ask_token) scopes.add('ask');
     if (bearer === authCfg.agent_token) scopes.add('agent');

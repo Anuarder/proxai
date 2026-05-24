@@ -33,6 +33,12 @@ describe('auth middleware + requireMode', () => {
     expect(r.body.error.code).toBe('forbidden_mode');
   });
 
+  it('forbids agent token with mode=ask (403 forbidden_mode)', async () => {
+    const r = await request(app('a', 'b')).post('/x').set('Authorization', 'Bearer b').send({ mode: 'ask' });
+    expect(r.status).toBe(403);
+    expect(r.body.error.code).toBe('forbidden_mode');
+  });
+
   it('allows agent token with mode=agent', async () => {
     const r = await request(app('a', 'b')).post('/x').set('Authorization', 'Bearer b').send({ mode: 'agent' });
     expect(r.status).toBe(200);
