@@ -22,3 +22,8 @@
 
 - SQLite store and session manager.
 - `better-sqlite3` dependency.
+
+## Known gaps
+
+- **Codex + ask mode is not supported in v2.** The Codex CLI flag surface for tool whitelisting / MCP config / system prompt has not been verified, so the adapter fails closed: any request to the `codex-cli` model with a non-null `allowed_tools`, `mcp_config_file`, or `system_prompt` (i.e. ask mode with the default `proxai.config.yaml`) returns a typed `error` event with `code: 'mode_unsupported'` instead of spawning. Use `claude-code` for ask mode, or use Codex only in agent mode. A follow-up task will verify the Codex flag set and re-enable Codex ask mode.
+- **`ask-mcp.json` ships with Context7 only.** No standard web-search MCP is bundled. Extend the file to add any additional safe MCPs your environment provides.

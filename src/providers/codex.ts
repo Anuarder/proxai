@@ -67,20 +67,28 @@ export class CodexAdapter implements ProviderAdapter {
   constructor(private readonly registry: import('../lifecycle/children.js').ChildRegistry) {}
 
   send(messages: Message[], modeConfig: ModeConfig, signal: AbortSignal): SendResult {
+    // Codex flag surface for tool whitelisting / MCP config / system prompt is not yet verified
+    // (see Task 9 discovery note above). To honour the spec's fail-closed guarantee for ask
+    // mode, refuse to spawn the process when modeConfig requests restrictions we cannot enforce.
+    if (modeConfig.allowedTools !== null || modeConfig.mcpConfigFile !== null || modeConfig.systemPrompt !== null) {
+      const refused: ProxaiEvent[] = [
+        { type: 'start', request_id: 'req_refused_' + Date.now(), model: this.modelId, provider: this.name },
+        {
+          type: 'error',
+          code: 'mode_unsupported',
+          message: 'Codex adapter cannot enforce ask-mode restrictions yet: CLI flag surface is unverified. Use claude-code for ask mode, or set this provider only in modes with null allowed_tools/system_prompt/mcp_config_file.',
+          retriable: false,
+        },
+        { type: 'turn_complete', reason: 'error' },
+        { type: 'done' },
+      ];
+      return {
+        events: (async function* () { for (const e of refused) yield e; })(),
+      };
+    }
+
     const prompt = assemblePrompt(messages);
     const args: string[] = ['exec', '--json'];
-    // NOTE: Codex flag names for systemPrompt / allowedTools / mcpConfigFile require
-    // verification against the installed Codex CLI version. Until then the
-    // corresponding modeConfig fields are not translated for Codex.
-    if (modeConfig.systemPrompt) {
-      // Example: args.push('--instructions', modeConfig.systemPrompt);
-    }
-    if (modeConfig.allowedTools) {
-      // Example: args.push('--sandbox', 'read-only'); + a tools allowlist if exposed.
-    }
-    if (modeConfig.mcpConfigFile) {
-      // Example: args.push('--mcp-config', modeConfig.mcpConfigFile);
-    }
     args.push(prompt);
 
     const env = { ...process.env };
@@ -109,8 +117,7 @@ export class CodexAdapter implements ProviderAdapter {
         provider: self.name,
       })) yield ev;
 
-      // Wait for proc exit so exitCode is reliably set before checks
-      // (same fix applied in Claude adapter — Task 8).
+      // Wait for proc exit so exitCode is reliably set before checks (same fix as Claude adapter).
       if (proc.exitCode === null) {
         await new Promise<void>((resolve) => {
           proc.once('exit', () => resolve());
