@@ -148,4 +148,10 @@ describe('parseConfig (model selection)', () => {
     const bad = validYamlWithModels.replace('default_model: "claude-sonnet"', 'default_model: "claude-bogus"');
     expect(() => parseConfig(bad)).toThrow(/default_model/i);
   });
+
+  it('rejects default_model when models[] is absent', () => {
+    // Start from validYamlWithModels and strip the models: block, leaving default_model in place.
+    const noModels = validYamlWithModels.replace(/    models:[\s\S]*?cli_model: "haiku"\n/, '');
+    expect(() => parseConfig(noModels)).toThrow(/default_model/i);
+  });
 });
