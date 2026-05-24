@@ -14,7 +14,7 @@ export function createServer(config: ProxaiConfig) {
   const children = new ChildRegistry();
   const router = new ProviderRouter(config, children);
   // Note: the spec mentions a 30s "reaper" as a safety net. v2 omits it because every
-  // child is now owned by an AbortController that fires on req.on('close'), request
+  // child is now owned by an AbortController that fires on res.on('close'), request
   // timeout, idle timeout, and process shutdown. If a leak is observed in practice,
   // add timestamps to ChildRegistry and a setInterval sweep here.
 
@@ -33,13 +33,14 @@ export function createServer(config: ProxaiConfig) {
   const auth = createAuthMiddleware(config.auth);
 
   const deps = {
-    getAdapter: (id: string) => router.getAdapter(id),
+    getModelEntry: (id: string) => router.getModelEntry(id),
     resolveModeConfig: (m: 'ask' | 'agent') => resolveModeConfig(m, config),
     timeouts: config.timeouts,
   };
 
   app.get('/v1/models', auth, createModelsRoute({
-    probeAll: () => router.probeAll(config.timeouts.probe_timeout_ms),
+    listModels: () => router.listModels(),
+    probeProviders: () => router.probeProviders(config.timeouts.probe_timeout_ms),
   }));
 
   app.post('/v1/chat/stream', auth, requireMode(), createStreamRoute(deps));
