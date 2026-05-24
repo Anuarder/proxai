@@ -31,6 +31,9 @@ Expand proxai beyond Claude CLI and Codex CLI to support more AI providers.
 
 ---
 
+> **Superseded by** `docs/superpowers/specs/2026-05-24-proxai-v2-ui-api-hardening-design.md`.
+> Items still relevant after v2 lands (stats dashboard, request inspector) can be re-extracted as a follow-up PRD.
+
 ## PRD: Test UI Improvements
 
 The current test UI (`public/index.html`) is a minimal vanilla JS chat. Needs significant upgrades to be useful for daily development and debugging.

@@ -1,58 +1,60 @@
 import { describe, it, expect } from 'vitest';
 import express from 'express';
 import request from 'supertest';
-import { createAuthMiddleware } from '../src/middleware/auth.js';
+import { createAuthMiddleware, requireMode } from '../src/middleware/auth.js';
 
-function createApp(token: string): express.Express {
-  const app = express();
-  app.use(createAuthMiddleware(token));
-  app.get('/test', (_req, res) => {
-    res.json({ ok: true });
-  });
-  return app;
+function app(askToken: string, agentToken: string, adminToken?: string) {
+  const a = express();
+  a.use(express.json());
+  const auth = createAuthMiddleware({ ask_token: askToken, agent_token: agentToken, admin_token: adminToken });
+  a.post('/x', auth, requireMode(), (_req, res) => res.json({ ok: true }));
+  return a;
 }
 
-describe('auth middleware', () => {
-  const token = 'test-secret-key';
-
-  it('allows requests with valid Bearer token', async () => {
-    const app = createApp(token);
-
-    const res = await request(app)
-      .get('/test')
-      .set('Authorization', `Bearer ${token}`);
-
-    expect(res.status).toBe(200);
-    expect(res.body).toEqual({ ok: true });
+describe('auth middleware + requireMode', () => {
+  it('rejects missing Authorization', async () => {
+    const r = await request(app('a', 'b')).post('/x').send({ mode: 'ask' });
+    expect(r.status).toBe(401);
   });
 
-  it('rejects requests without Authorization header', async () => {
-    const app = createApp(token);
-
-    const res = await request(app).get('/test');
-
-    expect(res.status).toBe(401);
-    expect(res.body).toEqual({
-      error: {
-        message: 'Missing Authorization header',
-        type: 'auth_error',
-      },
-    });
+  it('rejects unknown bearer', async () => {
+    const r = await request(app('a', 'b')).post('/x').set('Authorization', 'Bearer nope').send({ mode: 'ask' });
+    expect(r.status).toBe(401);
   });
 
-  it('rejects requests with wrong token', async () => {
-    const app = createApp(token);
+  it('allows ask token with mode=ask', async () => {
+    const r = await request(app('a', 'b')).post('/x').set('Authorization', 'Bearer a').send({ mode: 'ask' });
+    expect(r.status).toBe(200);
+  });
 
-    const res = await request(app)
-      .get('/test')
-      .set('Authorization', 'Bearer wrong-token');
+  it('forbids ask token with mode=agent (403 forbidden_mode)', async () => {
+    const r = await request(app('a', 'b')).post('/x').set('Authorization', 'Bearer a').send({ mode: 'agent' });
+    expect(r.status).toBe(403);
+    expect(r.body.error.code).toBe('forbidden_mode');
+  });
 
-    expect(res.status).toBe(401);
-    expect(res.body).toEqual({
-      error: {
-        message: 'Invalid API key',
-        type: 'auth_error',
-      },
-    });
+  it('forbids agent token with mode=ask (403 forbidden_mode)', async () => {
+    const r = await request(app('a', 'b')).post('/x').set('Authorization', 'Bearer b').send({ mode: 'ask' });
+    expect(r.status).toBe(403);
+    expect(r.body.error.code).toBe('forbidden_mode');
+  });
+
+  it('allows agent token with mode=agent', async () => {
+    const r = await request(app('a', 'b')).post('/x').set('Authorization', 'Bearer b').send({ mode: 'agent' });
+    expect(r.status).toBe(200);
+  });
+
+  it('admin token allows both modes', async () => {
+    const ask = await request(app('a', 'b', 'admin')).post('/x').set('Authorization', 'Bearer admin').send({ mode: 'ask' });
+    expect(ask.status).toBe(200);
+    const ag = await request(app('a', 'b', 'admin')).post('/x').set('Authorization', 'Bearer admin').send({ mode: 'agent' });
+    expect(ag.status).toBe(200);
+  });
+
+  it('rejects missing/invalid mode field with 400', async () => {
+    const r = await request(app('a', 'b')).post('/x').set('Authorization', 'Bearer a').send({});
+    expect(r.status).toBe(400);
+    const r2 = await request(app('a', 'b')).post('/x').set('Authorization', 'Bearer a').send({ mode: 'plan' });
+    expect(r2.status).toBe(400);
   });
 });

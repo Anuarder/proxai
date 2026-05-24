@@ -276,6 +276,16 @@
     button.send:active { transform: scale(0.97); }
     button.send:disabled { opacity: 0.4; cursor: not-allowed; filter: none; box-shadow: none; }
 
+    .mode-toggle { display:inline-flex; border:1px solid var(--border); border-radius:4px; overflow:hidden; }
+    .mode-toggle .mode-opt { background:transparent; color:var(--text-secondary); font:600 11px var(--mono); padding:6px 10px; border:0; cursor:pointer; letter-spacing:.08em; text-transform:uppercase; }
+    .mode-toggle .mode-opt.active { background:var(--accent); color:var(--bg-primary); }
+    details.tokens { font:11px var(--mono); color:var(--text-secondary); }
+    details.tokens summary { cursor:pointer; padding:4px 8px; border:1px solid var(--border); border-radius:4px; background:var(--bg-tertiary); }
+    details.tokens label { display:block; margin-top:6px; }
+    details.tokens input { width:170px; }
+    button.clear { background:transparent; color:var(--text-secondary); border:1px solid var(--border); border-radius:4px; padding:6px 10px; cursor:pointer; font:11px var(--mono); text-transform:uppercase; }
+    button.clear:hover { color:var(--error); border-color:var(--error); }
+
     .input-hint {
       max-width: 780px;
       margin: 6px auto 0;
@@ -283,18 +293,50 @@
       font-size: 10px;
       color: var(--text-muted);
     }
+
+    #modelSelect option[data-status="ready"] { color: var(--accent); }
+    #modelSelect option[data-status="not_authenticated"], #modelSelect option[data-status="error"] { color: var(--error); }
+    #modelSelect option[data-status="missing_binary"] { color: var(--text-muted); }
+
+    .msg .timeline { display:flex; flex-direction:column; gap:4px; margin:6px 0; }
+    .tl-row { font:12px var(--mono); color:var(--text-secondary); padding:4px 8px; background:var(--bg-tertiary); border-left:2px solid var(--border); border-radius:3px; }
+    .tl-tag { display:inline-block; padding:1px 6px; border-radius:3px; font-weight:600; text-transform:uppercase; font-size:10px; margin-right:6px; letter-spacing:.06em; }
+    .tl-tag.think { background:#553a99; color:#fff; }
+    .tl-tag.tool { background:#2a3a55; color:#9ab; }
+    .tl-tag.result { background:#2a553a; color:#9ba; }
+    .tl-tag.file { background:#553a2a; color:#ec9; }
+    .tl-tag.cmd { background:#3a3a55; color:#abe; }
+    .tl-tag.usage { background:var(--bg-input); color:var(--text-muted); }
+    .tl-tag.err { background:var(--error); color:#fff; }
+    .msg .answer { font-family:var(--sans); font-size:14px; line-height:1.65; white-space:pre-wrap; }
+    .msg .answer pre { background:var(--bg-input); border:1px solid var(--border); border-radius:4px; padding:10px 12px; overflow-x:auto; font:12px var(--mono); margin:8px 0; }
+    .msg .answer code { font-family:var(--mono); }
+    .msg .answer p { margin:6px 0; }
+    .msg .answer ul, .msg .answer ol { margin:6px 0 6px 22px; }
+    .auth-banner { background:var(--error-dim); color:var(--error); padding:10px 16px; font:13px var(--mono); border-bottom:1px solid var(--error); display:flex; gap:10px; align-items:center; }
+    .auth-banner button { margin-left:auto; background:var(--error); color:#fff; border:0; padding:4px 10px; cursor:pointer; border-radius:3px; }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.0/dist/purify.min.js" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.9.0/styles/atom-one-dark.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.9.0/highlight.min.js"></script>
 </head>
 <body>
 
   <header>
     <div class="logo">proxai <span>/ chat</span></div>
-    <div class="session-badge" id="sessionBadge"></div>
     <div class="header-controls">
-      <select id="modelSelect">
-        <option value="">loading models…</option>
-      </select>
-      <input type="password" id="tokenInput" value="your-secret-key" placeholder="Bearer token">
+      <div class="mode-toggle" id="modeToggle" role="radiogroup" aria-label="Mode">
+        <button type="button" class="mode-opt active" data-mode="ask">Ask</button>
+        <button type="button" class="mode-opt" data-mode="agent">Agent</button>
+      </div>
+      <select id="modelSelect"><option value="">loading models</option></select>
+      <details class="tokens">
+        <summary>tokens</summary>
+        <label>Ask <input type="password" id="askToken" placeholder="ask token"></label>
+        <label>Agent <input type="password" id="agentToken" placeholder="agent token"></label>
+      </details>
+      <button type="button" id="clearBtn" class="clear">Clear</button>
     </div>
   </header>
 
@@ -315,181 +357,251 @@
   </div>
 
   <script>
-    const $ = (sel) => document.querySelector(sel);
-    const messagesEl = $('#messages');
-    const emptyState = $('#emptyState');
-    const input = $('#input');
-    const sendBtn = $('#sendBtn');
-    const modelSelect = $('#modelSelect');
-    const tokenInput = $('#tokenInput');
-    const sessionBadge = $('#sessionBadge');
+const $ = (sel) => document.querySelector(sel);
+const messagesEl = $('#messages');
+const input = $('#input');
+const sendBtn = $('#sendBtn');
+const modelSelect = $('#modelSelect');
+const askTokenInput = $('#askToken');
+const agentTokenInput = $('#agentToken');
+const clearBtn = $('#clearBtn');
+const modeToggle = $('#modeToggle');
 
-    let sessionId = null;
-    let isStreaming = false;
+let mode = localStorage.getItem('proxai.mode') || 'ask';
+askTokenInput.value = localStorage.getItem('proxai.ask_token') || '';
+agentTokenInput.value = localStorage.getItem('proxai.agent_token') || '';
+const messageHistory = [];
+let inFlight = null;
 
-    // ── Auto-resize textarea ──
-    input.addEventListener('input', () => {
-      input.style.height = 'auto';
-      input.style.height = Math.min(input.scrollHeight, 200) + 'px';
+function setMode(m) {
+  mode = m;
+  localStorage.setItem('proxai.mode', m);
+  for (const b of modeToggle.querySelectorAll('.mode-opt')) {
+    b.classList.toggle('active', b.dataset.mode === m);
+  }
+}
+setMode(mode);
+
+modeToggle.addEventListener('click', (e) => {
+  const t = e.target.closest('.mode-opt'); if (!t) return;
+  setMode(t.dataset.mode);
+});
+askTokenInput.addEventListener('change', () => localStorage.setItem('proxai.ask_token', askTokenInput.value));
+agentTokenInput.addEventListener('change', () => localStorage.setItem('proxai.agent_token', agentTokenInput.value));
+
+function activeToken() { return mode === 'ask' ? askTokenInput.value : agentTokenInput.value; }
+
+function resetTranscript() {
+  while (messagesEl.firstChild) messagesEl.removeChild(messagesEl.firstChild);
+  const empty = document.createElement('div');
+  empty.className = 'empty-state';
+  const icon = document.createElement('div'); icon.className = 'icon'; icon.textContent = 'o';
+  const tip = document.createElement('div'); tip.textContent = 'Send a message to start a session';
+  empty.appendChild(icon); empty.appendChild(tip);
+  messagesEl.appendChild(empty);
+}
+
+clearBtn.addEventListener('click', () => { messageHistory.length = 0; resetTranscript(); });
+
+input.addEventListener('input', () => { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 200) + 'px'; });
+input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSend(); } });
+sendBtn.addEventListener('click', () => onSend());
+
+async function loadModels() {
+  while (modelSelect.firstChild) modelSelect.removeChild(modelSelect.firstChild);
+  const loading = document.createElement('option');
+  loading.value = ''; loading.textContent = 'loading';
+  modelSelect.appendChild(loading);
+  try {
+    const r = await fetch('/v1/models', { headers: { 'Authorization': 'Bearer ' + activeToken() } });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const body = await r.json();
+    while (modelSelect.firstChild) modelSelect.removeChild(modelSelect.firstChild);
+    for (const m of body.data) {
+      const opt = document.createElement('option');
+      opt.value = m.id;
+      const badge = ({ ready: 'o', not_authenticated: '!', missing_binary: '?', error: 'x' })[m.status] || '?';
+      opt.textContent = badge + '  ' + m.id + (m.cli_model ? ' — ' + m.cli_model : '');
+      if (m.status === 'not_authenticated') opt.title = m.hint || '';
+      else if (m.status === 'error') opt.title = m.message || '';
+      opt.dataset.status = m.status;
+      modelSelect.appendChild(opt);
+    }
+  } catch (err) {
+    while (modelSelect.firstChild) modelSelect.removeChild(modelSelect.firstChild);
+    const opt = document.createElement('option');
+    opt.value = ''; opt.textContent = 'load failed: ' + err.message;
+    modelSelect.appendChild(opt);
+  }
+}
+loadModels();
+askTokenInput.addEventListener('change', loadModels);
+agentTokenInput.addEventListener('change', loadModels);
+modeToggle.addEventListener('click', () => setTimeout(loadModels, 0));
+
+function makeEl(tag, className, text) {
+  const el = document.createElement(tag);
+  if (className) el.className = className;
+  if (text !== undefined) el.textContent = text;
+  return el;
+}
+
+function clearEl(el) { while (el.firstChild) el.removeChild(el.firstChild); }
+
+function appendUserBubble(text) {
+  const empty = messagesEl.querySelector('.empty-state'); if (empty) empty.remove();
+  const div = makeEl('div', 'msg user');
+  div.appendChild(makeEl('div', 'role-label', 'user'));
+  div.appendChild(makeEl('div', 'content', text));
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function appendAssistantBubble() {
+  const empty = messagesEl.querySelector('.empty-state'); if (empty) empty.remove();
+  const div = makeEl('div', 'msg assistant');
+  div.appendChild(makeEl('div', 'role-label', 'assistant'));
+  const timeline = makeEl('div', 'timeline');
+  const answer = makeEl('div', 'answer');
+  const cursor = makeEl('span', 'cursor');
+  answer.appendChild(cursor);
+  div.appendChild(timeline);
+  div.appendChild(answer);
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  return { bubble: div, timeline, answer };
+}
+
+function addTimelineRow(timeline, tagClass, tagText, text) {
+  const row = makeEl('div', 'tl-row');
+  row.appendChild(makeEl('span', 'tl-tag ' + tagClass, tagText));
+  row.appendChild(document.createTextNode(' '));
+  row.appendChild(document.createTextNode(text));
+  timeline.appendChild(row);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  return row;
+}
+
+function addTimelineCode(timeline, tagClass, tagText, codeText, suffix) {
+  const row = makeEl('div', 'tl-row');
+  row.appendChild(makeEl('span', 'tl-tag ' + tagClass, tagText));
+  row.appendChild(document.createTextNode(' '));
+  row.appendChild(makeEl('code', null, codeText));
+  if (suffix) row.appendChild(document.createTextNode(' ' + suffix));
+  timeline.appendChild(row);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  return row;
+}
+
+function renderAnswer(answerEl, text) {
+  // marked.parse produces HTML; DOMPurify.sanitize strips any unsafe nodes/attributes
+  // before assignment to innerHTML. This is the ONLY innerHTML assignment in the UI,
+  // and it always operates on the sanitiser's output, never on raw model text.
+  const html = DOMPurify.sanitize(marked.parse(text), { USE_PROFILES: { html: true } });
+  answerEl.innerHTML = html;
+  if (window.hljs) answerEl.querySelectorAll('pre code').forEach((el) => hljs.highlightElement(el));
+  answerEl.appendChild(makeEl('span', 'cursor'));
+}
+
+function showAuthBanner(data) {
+  let banner = document.querySelector('.auth-banner');
+  if (banner) banner.remove();
+  banner = makeEl('div', 'auth-banner');
+  banner.appendChild(makeEl('strong', null, data.provider + ' auth required'));
+  banner.appendChild(document.createTextNode(' — '));
+  banner.appendChild(document.createTextNode(data.message));
+  banner.appendChild(document.createTextNode(' — '));
+  banner.appendChild(makeEl('code', null, data.hint));
+  const btn = makeEl('button', null, 'Re-check');
+  btn.addEventListener('click', async () => { await loadModels(); banner.remove(); });
+  banner.appendChild(btn);
+  document.body.insertBefore(banner, document.body.firstChild.nextSibling);
+}
+
+async function onSend() {
+  if (inFlight) return;
+  const text = input.value.trim(); if (!text) return;
+  const model = modelSelect.value; if (!model) { alert('No model selected'); return; }
+  const tok = activeToken(); if (!tok) { alert('Please set the ' + mode + ' token first.'); return; }
+
+  messageHistory.push({ role: 'user', content: text });
+  appendUserBubble(text);
+  input.value = ''; input.style.height = 'auto';
+
+  const { timeline, answer } = appendAssistantBubble();
+  let assistantText = '';
+
+  inFlight = new AbortController();
+  sendBtn.textContent = 'Cancel';
+  const sendHandler = () => onSend();
+  sendBtn.onclick = () => inFlight && inFlight.abort();
+
+  try {
+    const res = await fetch('/v1/chat/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
+      body: JSON.stringify({ model: model, mode: mode, messages: messageHistory }),
+      signal: inFlight.signal,
     });
-
-    // ── Keyboard handling ──
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage();
-      }
-    });
-
-    sendBtn.addEventListener('click', sendMessage);
-
-    // ── Load models ──
-    async function loadModels() {
-      try {
-        const res = await fetch('/v1/models', {
-          headers: { 'Authorization': 'Bearer ' + tokenInput.value },
-        });
-        if (!res.ok) throw new Error('Failed to fetch models');
-        const body = await res.json();
-        modelSelect.innerHTML = '';
-        body.data.forEach((m) => {
-          const opt = document.createElement('option');
-          opt.value = m.id;
-          opt.textContent = m.id;
-          modelSelect.appendChild(opt);
-        });
-      } catch (err) {
-        modelSelect.innerHTML = '<option value="">error loading</option>';
-      }
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error((body.error && body.error.message) || ('HTTP ' + res.status));
     }
-
-    tokenInput.addEventListener('change', loadModels);
-    loadModels();
-
-    // ── Append message bubble ──
-    function appendMessage(role, content) {
-      if (emptyState) emptyState.remove();
-      const div = document.createElement('div');
-      div.className = 'msg ' + role;
-      div.innerHTML = '<div class="role-label">' + role + '</div><div class="content"></div>';
-      div.querySelector('.content').textContent = content;
-      messagesEl.appendChild(div);
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-      return div;
-    }
-
-    function appendError(text) {
-      if (emptyState) emptyState.remove();
-      const div = document.createElement('div');
-      div.className = 'msg error';
-      div.textContent = text;
-      messagesEl.appendChild(div);
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-    }
-
-    // ── Send message ──
-    async function sendMessage() {
-      const text = input.value.trim();
-      if (!text || isStreaming) return;
-
-      const model = modelSelect.value;
-      if (!model) {
-        appendError('No model selected');
-        return;
-      }
-
-      isStreaming = true;
-      sendBtn.disabled = true;
-      input.value = '';
-      input.style.height = 'auto';
-
-      appendMessage('user', text);
-
-      const body = {
-        model: model,
-        messages: [{ role: 'user', content: text }],
-        stream: true,
-      };
-      if (sessionId) body.session_id = sessionId;
-
-      // Create assistant bubble with cursor
-      const assistantDiv = appendMessage('assistant', '');
-      const contentEl = assistantDiv.querySelector('.content');
-      contentEl.innerHTML = '<span class="cursor"></span>';
-
-      try {
-        const res = await fetch('/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + tokenInput.value,
-          },
-          body: JSON.stringify(body),
-        });
-
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({ error: { message: res.statusText } }));
-          throw new Error(err.error?.message || 'Request failed');
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    let currentEvent = null;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split('\n'); buf = lines.pop();
+      for (const raw of lines) {
+        const line = raw.trimEnd();
+        if (!line) continue;
+        if (line.startsWith(':')) continue;
+        if (line.startsWith('event: ')) { currentEvent = line.slice(7); continue; }
+        if (line.startsWith('data: ')) {
+          const json = line.slice(6);
+          let data; try { data = JSON.parse(json); } catch { continue; }
+          handleEvent(currentEvent || data.type, data);
         }
-
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let fullContent = '';
-        let buffer = '';
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop();
-
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed || !trimmed.startsWith('data: ')) continue;
-            const payload = trimmed.slice(6);
-            if (payload === '[DONE]') continue;
-
-            try {
-              const data = JSON.parse(payload);
-
-              // Capture session ID from first chunk
-              if (data.session_id && !sessionId) {
-                sessionId = data.session_id;
-                sessionBadge.textContent = 'session: ' + sessionId.slice(0, 12) + '…';
-                sessionBadge.classList.add('visible');
-              }
-
-              const delta = data.choices?.[0]?.delta?.content;
-              if (delta) {
-                fullContent += delta;
-                contentEl.textContent = fullContent;
-                const cursor = document.createElement('span');
-                cursor.className = 'cursor';
-                contentEl.appendChild(cursor);
-                messagesEl.scrollTop = messagesEl.scrollHeight;
-              }
-            } catch {
-              // skip malformed chunks
-            }
-          }
-        }
-
-        // Remove cursor after stream ends
-        const cursor = contentEl.querySelector('.cursor');
-        if (cursor) cursor.remove();
-
-      } catch (err) {
-        // Remove empty assistant bubble on error
-        assistantDiv.remove();
-        appendError(err.message);
-      } finally {
-        isStreaming = false;
-        sendBtn.disabled = false;
-        input.focus();
       }
     }
+  } catch (err) {
+    if (err && err.name === 'AbortError') addTimelineRow(timeline, 'err', 'aborted', '');
+    else addTimelineRow(timeline, 'err', 'error', String(err && err.message ? err.message : err));
+  } finally {
+    const cur = answer.querySelector('.cursor'); if (cur) cur.remove();
+    if (assistantText) messageHistory.push({ role: 'assistant', content: assistantText });
+    inFlight = null;
+    sendBtn.textContent = 'Send';
+    sendBtn.onclick = sendHandler;
+  }
+
+  function handleEvent(type, data) {
+    if (type === 'text_delta') {
+      assistantText += data.text;
+      renderAnswer(answer, assistantText);
+    } else if (type === 'thinking_delta') {
+      addTimelineRow(timeline, 'think', 'thinking', data.text);
+    } else if (type === 'tool_use') {
+      addTimelineCode(timeline, 'tool', 'tool ' + data.name, JSON.stringify(data.input).slice(0, 120));
+    } else if (type === 'tool_result') {
+      addTimelineRow(timeline, data.is_error ? 'err' : 'result', data.is_error ? 'error' : 'result', String(data.content).slice(0, 200));
+    } else if (type === 'file_edit') {
+      addTimelineRow(timeline, 'file', data.action, data.path + ' — ' + data.summary);
+    } else if (type === 'command_exec') {
+      addTimelineCode(timeline, 'cmd', 'exec', data.command, data.exit_code !== undefined ? '→ ' + data.exit_code : '');
+    } else if (type === 'auth_required') {
+      showAuthBanner(data);
+    } else if (type === 'error') {
+      addTimelineRow(timeline, 'err', 'error', data.message);
+    } else if (type === 'usage') {
+      addTimelineRow(timeline, 'usage', 'usage', 'in=' + data.input_tokens + ' out=' + data.output_tokens);
+    }
+  }
+}
   </script>
 </body>
 </html>

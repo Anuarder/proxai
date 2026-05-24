@@ -2,51 +2,69 @@ import { describe, it, expect } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 import { createModelsRoute } from '../../src/routes/models.js';
+import type { ModelEntry } from '../../src/providers/router.js';
+import type { ProviderAdapter, ProbeResult } from '../../src/providers/adapter.js';
 
-function createApp(providers: Record<string, { model_id: string }>): express.Express {
-  const app = express();
-  app.get('/v1/models', createModelsRoute(providers));
-  return app;
-}
+const dummyAdapter = (name: string, modelId: string): ProviderAdapter => ({
+  name,
+  modelId,
+  async probe() { return { status: 'ready' }; },
+  send() { return { events: (async function* () {})() }; },
+});
 
 describe('GET /v1/models', () => {
-  it('returns list of configured providers in OpenAI-compatible format', async () => {
-    const providers = {
-      claude: { model_id: 'claude-code' },
-      codex: { model_id: 'codex-cli' },
-    };
-    const app = createApp(providers);
+  it('returns one entry per ModelEntry with cli_model and fanned-out provider probe', async () => {
+    const claude = dummyAdapter('claude', 'claude-code');
+    const codex = dummyAdapter('codex', 'codex-cli');
+    const models: ModelEntry[] = [
+      { id: 'claude-opus', adapter: claude, cliModel: 'opus', providerName: 'claude' },
+      { id: 'claude-sonnet', adapter: claude, cliModel: 'sonnet', providerName: 'claude' },
+      { id: 'claude-code', adapter: claude, cliModel: 'sonnet', providerName: 'claude' },
+      { id: 'codex-cli', adapter: codex, cliModel: null, providerName: 'codex' },
+    ];
+    const probes = new Map<string, ProbeResult>([
+      ['claude', { status: 'ready' }],
+      ['codex', { status: 'not_authenticated', hint: 'Run: codex login' }],
+    ]);
+
+    const app = express();
+    app.get('/v1/models', createModelsRoute({
+      listModels: () => models,
+      probeProviders: async () => probes,
+    }));
 
     const res = await request(app).get('/v1/models');
-
     expect(res.status).toBe(200);
-    expect(res.body.object).toBe('list');
-    expect(res.body.data).toHaveLength(2);
-
-    for (const model of res.body.data) {
-      expect(model).toHaveProperty('id');
-      expect(model.object).toBe('model');
-      expect(model.created).toEqual(expect.any(Number));
-      expect(model.owned_by).toMatch(/^proxai:/);
-    }
-
-    const ids = res.body.data.map((m: { id: string }) => m.id);
-    expect(ids).toContain('claude-code');
-    expect(ids).toContain('codex-cli');
-
-    const claude = res.body.data.find((m: { id: string }) => m.id === 'claude-code');
-    expect(claude.owned_by).toBe('proxai:claude');
-
-    const codex = res.body.data.find((m: { id: string }) => m.id === 'codex-cli');
-    expect(codex.owned_by).toBe('proxai:codex');
+    expect(res.body.data).toEqual([
+      { id: 'claude-opus', object: 'model', owned_by: 'proxai:claude', cli_model: 'opus', status: 'ready' },
+      { id: 'claude-sonnet', object: 'model', owned_by: 'proxai:claude', cli_model: 'sonnet', status: 'ready' },
+      { id: 'claude-code', object: 'model', owned_by: 'proxai:claude', cli_model: 'sonnet', status: 'ready' },
+      { id: 'codex-cli', object: 'model', owned_by: 'proxai:codex', cli_model: null, status: 'not_authenticated', hint: 'Run: codex login' },
+    ]);
   });
 
-  it('returns empty list when no providers configured', async () => {
-    const app = createApp({});
+  it('probes each provider exactly once even with multiple model entries', async () => {
+    const claude = dummyAdapter('claude', 'claude-code');
+    let probeCalls = 0;
+    const probeProviders = async () => {
+      probeCalls += 1;
+      return new Map<string, ProbeResult>([['claude', { status: 'ready' }]]);
+    };
+    const models: ModelEntry[] = [
+      { id: 'claude-opus', adapter: claude, cliModel: 'opus', providerName: 'claude' },
+      { id: 'claude-sonnet', adapter: claude, cliModel: 'sonnet', providerName: 'claude' },
+      { id: 'claude-haiku', adapter: claude, cliModel: 'haiku', providerName: 'claude' },
+    ];
+
+    const app = express();
+    app.get('/v1/models', createModelsRoute({
+      listModels: () => models,
+      probeProviders,
+    }));
 
     const res = await request(app).get('/v1/models');
-
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ object: 'list', data: [] });
+    expect(res.body.data).toHaveLength(3);
+    expect(probeCalls).toBe(1);
   });
 });

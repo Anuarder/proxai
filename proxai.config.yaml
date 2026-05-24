@@ -3,18 +3,40 @@ server:
   host: "127.0.0.1"
 
 auth:
-  bearer_token: "your-secret-key"
+  ask_token: "change-me-ask"
+  agent_token: "change-me-agent"
 
-sessions:
-  idle_timeout_ms: 300000
-  max_concurrent: 10
+timeouts:
+  request_timeout_ms: 300000
+  idle_timeout_ms: 60000
+  probe_timeout_ms: 5000
+  process_kill_grace_ms: 2000
+
+modes:
+  ask:
+    system_prompt: "You are a chat assistant. You can use web search and documentation tools but cannot access the user's files or run shell commands."
+    allowed_tools:
+      - "WebSearch"
+      - "WebFetch"
+      - "mcp__context7__*"
+    mcp_config_file: "./ask-mcp.json"
+  agent:
+    system_prompt: null
+    allowed_tools: null
+    mcp_config_file: null
 
 providers:
   claude:
     command: "claude"
-    args: ["--print"]
     model_id: "claude-code"
+    default_model: "claude-sonnet"
+    models:
+      - id: "claude-opus"
+        cli_model: "opus"
+      - id: "claude-sonnet"
+        cli_model: "sonnet"
+      - id: "claude-haiku"
+        cli_model: "haiku"
   codex:
     command: "codex"
-    args: []
     model_id: "codex-cli"

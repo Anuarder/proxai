@@ -1,0 +1,6 @@
+{"type":"thread.started","thread_id":"thr_2"}
+{"type":"item.completed","item":{"type":"reasoning","text":"I should list files"}}
+{"type":"item.completed","item":{"type":"command","command":"ls","output":"a.ts\nb.ts","exit_code":0}}
+{"type":"item.completed","item":{"type":"file_change","path":"/a.ts","action":"edit"}}
+{"type":"item.completed","item":{"type":"agent_message","text":"done"}}
+{"type":"turn.completed","usage":{"input_tokens":12,"output_tokens":3}}
