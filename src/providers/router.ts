@@ -11,6 +11,13 @@ const adapterFactories: Record<string, AdapterFactory> = {
   codex: CodexAdapter,
 };
 
+export interface ModelEntry {
+  id: string;
+  adapter: ProviderAdapter;
+  cliModel: string | null;
+  providerName: string;
+}
+
 export interface ProbedModel {
   id: string;
   providerName: string;
@@ -18,36 +25,61 @@ export interface ProbedModel {
 }
 
 export class ProviderRouter {
-  private adapters = new Map<string, ProviderAdapter>();
+  private byId = new Map<string, ModelEntry>();
+  private adaptersByProvider = new Map<string, ProviderAdapter>();
 
   constructor(config: ProxaiConfig, registry: ChildRegistry) {
-    for (const [name, provider] of Object.entries(config.providers)) {
-      const Factory = adapterFactories[name];
+    for (const [providerName, provider] of Object.entries(config.providers)) {
+      const Factory = adapterFactories[providerName];
       if (!Factory) {
-        console.warn(`Unknown provider "${name}", skipping`);
+        console.warn(`Unknown provider "${providerName}", skipping`);
         continue;
       }
-      this.adapters.set(provider.model_id, new Factory(registry));
+      const adapter = new Factory(registry);
+      this.adaptersByProvider.set(providerName, adapter);
+
+      // Explicit catalog entries from provider.models[].
+      for (const m of provider.models ?? []) {
+        this.byId.set(m.id, {
+          id: m.id,
+          adapter,
+          cliModel: m.cli_model,
+          providerName,
+        });
+      }
+
+      // Back-compat alias keyed by provider.model_id, mapped to default_model's cli_model (or null).
+      if (!this.byId.has(provider.model_id)) {
+        const defaultEntry = provider.default_model
+          ? provider.models?.find((m) => m.id === provider.default_model)
+          : undefined;
+        this.byId.set(provider.model_id, {
+          id: provider.model_id,
+          adapter,
+          cliModel: defaultEntry?.cli_model ?? null,
+          providerName,
+        });
+      }
     }
   }
 
   getAdapter(modelId: string): ProviderAdapter | undefined {
-    return this.adapters.get(modelId);
+    return this.byId.get(modelId)?.adapter;
   }
 
-  listAdapters(): { id: string; adapter: ProviderAdapter }[] {
-    return Array.from(this.adapters.entries()).map(([id, adapter]) => ({ id, adapter }));
+  getModelEntry(modelId: string): ModelEntry | undefined {
+    return this.byId.get(modelId);
   }
 
-  async probeAll(timeoutMs: number): Promise<ProbedModel[]> {
-    const entries = Array.from(this.adapters.entries());
+  listModels(): ModelEntry[] {
+    return Array.from(this.byId.values());
+  }
+
+  async probeProviders(timeoutMs: number): Promise<Map<string, ProbeResult>> {
+    const entries = Array.from(this.adaptersByProvider.entries());
     const results = await Promise.all(
-      entries.map(async ([id, adapter]) => ({
-        id,
-        providerName: adapter.name,
-        result: await adapter.probe(timeoutMs),
-      })),
+      entries.map(async ([name, adapter]) => [name, await adapter.probe(timeoutMs)] as const),
     );
-    return results;
+    return new Map(results);
   }
 }
