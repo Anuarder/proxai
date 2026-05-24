@@ -18,11 +18,6 @@ export interface ModelEntry {
   providerName: string;
 }
 
-export interface ProbedModel {
-  id: string;
-  providerName: string;
-  result: ProbeResult;
-}
 
 export class ProviderRouter {
   private byId = new Map<string, ModelEntry>();
