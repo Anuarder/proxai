@@ -309,6 +309,10 @@
     .tl-tag.usage { background:var(--bg-input); color:var(--text-muted); }
     .tl-tag.err { background:var(--error); color:#fff; }
     .msg .answer { font-family:var(--sans); font-size:14px; line-height:1.65; white-space:pre-wrap; }
+    .msg .answer pre { background:var(--bg-input); border:1px solid var(--border); border-radius:4px; padding:10px 12px; overflow-x:auto; font:12px var(--mono); margin:8px 0; }
+    .msg .answer code { font-family:var(--mono); }
+    .msg .answer p { margin:6px 0; }
+    .msg .answer ul, .msg .answer ol { margin:6px 0 6px 22px; }
     .auth-banner { background:var(--error-dim); color:var(--error); padding:10px 16px; font:13px var(--mono); border-bottom:1px solid var(--error); display:flex; gap:10px; align-items:center; }
     .auth-banner button { margin-left:auto; background:var(--error); color:#fff; border:0; padding:4px 10px; cursor:pointer; border-radius:3px; }
   </style>
@@ -490,9 +494,12 @@ function addTimelineCode(timeline, tagClass, tagText, codeText, suffix) {
 }
 
 function renderAnswer(answerEl, text) {
-  // Task 19: plain-text render. Task 20 swaps this for DOMPurify-sanitised markdown.
-  clearEl(answerEl);
-  answerEl.appendChild(document.createTextNode(text));
+  // marked.parse produces HTML; DOMPurify.sanitize strips any unsafe nodes/attributes
+  // before assignment to innerHTML. This is the ONLY innerHTML assignment in the UI,
+  // and it always operates on the sanitiser's output, never on raw model text.
+  const html = DOMPurify.sanitize(marked.parse(text), { USE_PROFILES: { html: true } });
+  answerEl.innerHTML = html;
+  answerEl.querySelectorAll('pre code').forEach((el) => hljs.highlightElement(el));
   answerEl.appendChild(makeEl('span', 'cursor'));
 }
 
