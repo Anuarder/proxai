@@ -60,4 +60,38 @@ describe('POST /v1/chat/completions (OpenAI-compat)', () => {
     expect(res.text).toContain('"content":"world"');
     expect(res.text).toContain('[DONE]');
   });
+
+  it('forwards entry.cliModel to adapter.send', async () => {
+    let receivedCliModel: string | null | undefined;
+    const adapter: ProviderAdapter = {
+      name: 'claude',
+      modelId: 'claude-code',
+      async probe() { return { status: 'ready' as const }; },
+      send(_msgs, _mode, _signal, cliModel) {
+        receivedCliModel = cliModel;
+        return {
+          events: (async function* () {
+            yield { type: 'start', request_id: 'r', model: 'claude-opus', provider: 'claude' };
+            yield { type: 'text_delta', text: 'hi' };
+            yield { type: 'turn_complete', reason: 'stop' };
+            yield { type: 'done' };
+          })(),
+        };
+      },
+    };
+    const app = express();
+    app.use(express.json());
+    const route = createCompletionsRoute({
+      getModelEntry: () => ({ id: 'claude-opus', adapter, cliModel: 'opus', providerName: 'claude' }),
+      resolveModeConfig: () => ({ systemPrompt: null, allowedTools: null, mcpConfigFile: null }),
+      timeouts: { request_timeout_ms: 5000, idle_timeout_ms: 5000, probe_timeout_ms: 1000, process_kill_grace_ms: 100 },
+    });
+    app.post('/v1/chat/completions', (req, _res, next) => { (req as any).mode = 'agent'; next(); }, route);
+
+    await request(app).post('/v1/chat/completions').send({
+      model: 'claude-opus', mode: 'agent', messages: [{ role: 'user', content: 'hi' }], stream: false,
+    });
+
+    expect(receivedCliModel).toBe('opus');
+  });
 });
