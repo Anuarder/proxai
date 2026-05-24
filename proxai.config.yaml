@@ -29,6 +29,14 @@ providers:
   claude:
     command: "claude"
     model_id: "claude-code"
+    default_model: "claude-sonnet"
+    models:
+      - id: "claude-opus"
+        cli_model: "opus"
+      - id: "claude-sonnet"
+        cli_model: "sonnet"
+      - id: "claude-haiku"
+        cli_model: "haiku"
   codex:
     command: "codex"
     model_id: "codex-cli"
