@@ -297,6 +297,20 @@
     #modelSelect option[data-status="ready"] { color: var(--accent); }
     #modelSelect option[data-status="not_authenticated"], #modelSelect option[data-status="error"] { color: var(--error); }
     #modelSelect option[data-status="missing_binary"] { color: var(--text-muted); }
+
+    .msg .timeline { display:flex; flex-direction:column; gap:4px; margin:6px 0; }
+    .tl-row { font:12px var(--mono); color:var(--text-secondary); padding:4px 8px; background:var(--bg-tertiary); border-left:2px solid var(--border); border-radius:3px; }
+    .tl-tag { display:inline-block; padding:1px 6px; border-radius:3px; font-weight:600; text-transform:uppercase; font-size:10px; margin-right:6px; letter-spacing:.06em; }
+    .tl-tag.think { background:#553a99; color:#fff; }
+    .tl-tag.tool { background:#2a3a55; color:#9ab; }
+    .tl-tag.result { background:#2a553a; color:#9ba; }
+    .tl-tag.file { background:#553a2a; color:#ec9; }
+    .tl-tag.cmd { background:#3a3a55; color:#abe; }
+    .tl-tag.usage { background:var(--bg-input); color:var(--text-muted); }
+    .tl-tag.err { background:var(--error); color:#fff; }
+    .msg .answer { font-family:var(--sans); font-size:14px; line-height:1.65; white-space:pre-wrap; }
+    .auth-banner { background:var(--error-dim); color:var(--error); padding:10px 16px; font:13px var(--mono); border-bottom:1px solid var(--error); display:flex; gap:10px; align-items:center; }
+    .auth-banner button { margin-left:auto; background:var(--error); color:#fff; border:0; padding:4px 10px; cursor:pointer; border-radius:3px; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.0/dist/purify.min.js" crossorigin="anonymous"></script>
@@ -421,7 +435,166 @@ askTokenInput.addEventListener('change', loadModels);
 agentTokenInput.addEventListener('change', loadModels);
 modeToggle.addEventListener('click', () => setTimeout(loadModels, 0));
 
-function onSend() { /* implemented in Task 19 */ }
+function makeEl(tag, className, text) {
+  const el = document.createElement(tag);
+  if (className) el.className = className;
+  if (text !== undefined) el.textContent = text;
+  return el;
+}
+
+function clearEl(el) { while (el.firstChild) el.removeChild(el.firstChild); }
+
+function appendUserBubble(text) {
+  const empty = messagesEl.querySelector('.empty-state'); if (empty) empty.remove();
+  const div = makeEl('div', 'msg user');
+  div.appendChild(makeEl('div', 'role-label', 'user'));
+  div.appendChild(makeEl('div', 'content', text));
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function appendAssistantBubble() {
+  const empty = messagesEl.querySelector('.empty-state'); if (empty) empty.remove();
+  const div = makeEl('div', 'msg assistant');
+  div.appendChild(makeEl('div', 'role-label', 'assistant'));
+  const timeline = makeEl('div', 'timeline');
+  const answer = makeEl('div', 'answer');
+  const cursor = makeEl('span', 'cursor');
+  answer.appendChild(cursor);
+  div.appendChild(timeline);
+  div.appendChild(answer);
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  return { bubble: div, timeline, answer };
+}
+
+function addTimelineRow(timeline, tagClass, tagText, text) {
+  const row = makeEl('div', 'tl-row');
+  row.appendChild(makeEl('span', 'tl-tag ' + tagClass, tagText));
+  row.appendChild(document.createTextNode(' '));
+  row.appendChild(document.createTextNode(text));
+  timeline.appendChild(row);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  return row;
+}
+
+function addTimelineCode(timeline, tagClass, tagText, codeText, suffix) {
+  const row = makeEl('div', 'tl-row');
+  row.appendChild(makeEl('span', 'tl-tag ' + tagClass, tagText));
+  row.appendChild(document.createTextNode(' '));
+  row.appendChild(makeEl('code', null, codeText));
+  if (suffix) row.appendChild(document.createTextNode(' ' + suffix));
+  timeline.appendChild(row);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  return row;
+}
+
+function renderAnswer(answerEl, text) {
+  // Task 19: plain-text render. Task 20 swaps this for DOMPurify-sanitised markdown.
+  clearEl(answerEl);
+  answerEl.appendChild(document.createTextNode(text));
+  answerEl.appendChild(makeEl('span', 'cursor'));
+}
+
+function showAuthBanner(data) {
+  let banner = document.querySelector('.auth-banner');
+  if (banner) banner.remove();
+  banner = makeEl('div', 'auth-banner');
+  banner.appendChild(makeEl('strong', null, data.provider + ' auth required'));
+  banner.appendChild(document.createTextNode(' — '));
+  banner.appendChild(document.createTextNode(data.message));
+  banner.appendChild(document.createTextNode(' — '));
+  banner.appendChild(makeEl('code', null, data.hint));
+  const btn = makeEl('button', null, 'Re-check');
+  btn.addEventListener('click', async () => { await loadModels(); banner.remove(); });
+  banner.appendChild(btn);
+  document.body.insertBefore(banner, document.body.firstChild.nextSibling);
+}
+
+async function onSend() {
+  if (inFlight) return;
+  const text = input.value.trim(); if (!text) return;
+  const model = modelSelect.value; if (!model) { alert('No model selected'); return; }
+  const tok = activeToken(); if (!tok) { alert('Please set the ' + mode + ' token first.'); return; }
+
+  messageHistory.push({ role: 'user', content: text });
+  appendUserBubble(text);
+  input.value = ''; input.style.height = 'auto';
+
+  const { timeline, answer } = appendAssistantBubble();
+  let assistantText = '';
+
+  inFlight = new AbortController();
+  sendBtn.textContent = 'Cancel';
+  const sendHandler = () => onSend();
+  sendBtn.onclick = () => inFlight && inFlight.abort();
+
+  try {
+    const res = await fetch('/v1/chat/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
+      body: JSON.stringify({ model: model, mode: mode, messages: messageHistory }),
+      signal: inFlight.signal,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error((body.error && body.error.message) || ('HTTP ' + res.status));
+    }
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    let currentEvent = null;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split('\n'); buf = lines.pop();
+      for (const raw of lines) {
+        const line = raw.trimEnd();
+        if (!line) continue;
+        if (line.startsWith(':')) continue;
+        if (line.startsWith('event: ')) { currentEvent = line.slice(7); continue; }
+        if (line.startsWith('data: ')) {
+          const json = line.slice(6);
+          let data; try { data = JSON.parse(json); } catch { continue; }
+          handleEvent(currentEvent || data.type, data);
+        }
+      }
+    }
+  } catch (err) {
+    if (err && err.name === 'AbortError') addTimelineRow(timeline, 'err', 'aborted', '');
+    else addTimelineRow(timeline, 'err', 'error', String(err && err.message ? err.message : err));
+  } finally {
+    const cur = answer.querySelector('.cursor'); if (cur) cur.remove();
+    if (assistantText) messageHistory.push({ role: 'assistant', content: assistantText });
+    inFlight = null;
+    sendBtn.textContent = 'Send';
+    sendBtn.onclick = sendHandler;
+  }
+
+  function handleEvent(type, data) {
+    if (type === 'text_delta') {
+      assistantText += data.text;
+      renderAnswer(answer, assistantText);
+    } else if (type === 'thinking_delta') {
+      addTimelineRow(timeline, 'think', 'thinking', data.text);
+    } else if (type === 'tool_use') {
+      addTimelineCode(timeline, 'tool', 'tool ' + data.name, JSON.stringify(data.input).slice(0, 120));
+    } else if (type === 'tool_result') {
+      addTimelineRow(timeline, data.is_error ? 'err' : 'result', data.is_error ? 'error' : 'result', String(data.content).slice(0, 200));
+    } else if (type === 'file_edit') {
+      addTimelineRow(timeline, 'file', data.action, data.path + ' — ' + data.summary);
+    } else if (type === 'command_exec') {
+      addTimelineCode(timeline, 'cmd', 'exec', data.command, data.exit_code !== undefined ? '→ ' + data.exit_code : '');
+    } else if (type === 'auth_required') {
+      showAuthBanner(data);
+    } else if (type === 'error') {
+      addTimelineRow(timeline, 'err', 'error', data.message);
+    } else if (type === 'usage') {
+      addTimelineRow(timeline, 'usage', 'usage', 'in=' + data.input_tokens + ' out=' + data.output_tokens);
+    }
+  }
+}
   </script>
 </body>
 </html>
