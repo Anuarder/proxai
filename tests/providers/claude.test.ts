@@ -40,5 +40,9 @@ describe('mapClaudeStream', () => {
       expect(fe.action).toBe('read');
       expect(fe.path).toBe('/a.ts');
     }
+    const textDeltas = events.filter((e) => e.type === 'text_delta');
+    expect(textDeltas.length).toBeGreaterThan(0);
+    const concatText = textDeltas.map((e) => e.type === 'text_delta' ? e.text : '').join('');
+    expect(concatText).toContain('done');
   });
 });

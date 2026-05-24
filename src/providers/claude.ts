@@ -41,7 +41,9 @@ export async function* mapClaudeStream(
     }
     if (parsed.type === 'assistant' && Array.isArray(parsed.message?.content)) {
       for (const block of parsed.message.content) {
-        if (block.type === 'tool_use') {
+        if (block.type === 'text' && typeof block.text === 'string') {
+          yield { type: 'text_delta', text: block.text };
+        } else if (block.type === 'tool_use') {
           yield { type: 'tool_use', id: block.id, name: block.name, input: block.input };
           if (FILE_TOOLS.has(block.name)) {
             const p = block.input?.file_path ?? block.input?.path ?? '';
@@ -121,6 +123,15 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
         model: self.modelId,
         provider: self.name,
       })) yield ev;
+
+      // Wait for process exit so exitCode is set before we check it.
+      if (proc.exitCode === null) {
+        await new Promise<void>((resolve) => {
+          proc.once('exit', () => resolve());
+          proc.once('error', () => resolve());
+        });
+      }
+
       const authHit = detectAuthPattern(stderrTail, AUTH_PATTERNS.claude);
       if (authHit.matched) {
         yield { type: 'auth_required', provider: 'claude', message: stderrTail.trim() || 'Authentication required', hint: authHit.hint };
