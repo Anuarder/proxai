@@ -8,6 +8,7 @@ import { createAuthMiddleware, requireMode } from './middleware/auth.js';
 import { createModelsRoute } from './routes/models.js';
 import { createCompletionsRoute } from './routes/completions.js';
 import { createStreamRoute } from './routes/stream.js';
+import { createOpenApiRoute } from './routes/openapi.js';
 
 export function createServer(config: ProxaiConfig) {
   const children = new ChildRegistry();
@@ -24,6 +25,10 @@ export function createServer(config: ProxaiConfig) {
 
   // Static UI (no auth)
   app.use('/ui', express.static(path.join(process.cwd(), 'public')));
+
+  // OpenAPI spec + docs UI (unauthenticated — schema contains no secrets)
+  app.get('/openapi.json', createOpenApiRoute());
+  app.get('/docs', (_req, res) => res.sendFile(path.join(process.cwd(), 'public/docs.html')));
 
   const auth = createAuthMiddleware(config.auth);
 
