@@ -26,7 +26,7 @@ describe('POST /v1/chat/stream', () => {
     app.use(express.json());
     const fake = new FakeAdapter();
     const route = createStreamRoute({
-      getAdapter: () => fake,
+      getModelEntry: () => ({ id: 'claude-code', adapter: fake, cliModel: null, providerName: 'claude' }),
       resolveModeConfig: () => ({ systemPrompt: null, allowedTools: null, mcpConfigFile: null }),
       timeouts: { request_timeout_ms: 5000, idle_timeout_ms: 5000, probe_timeout_ms: 1000, process_kill_grace_ms: 100 },
     });
@@ -73,7 +73,7 @@ describe('POST /v1/chat/stream', () => {
     const app = express();
     app.use(express.json());
     const route = createStreamRoute({
-      getAdapter: () => adapter,
+      getModelEntry: () => ({ id: 'claude-code', adapter, cliModel: null, providerName: 'claude' }),
       resolveModeConfig: () => ({ systemPrompt: null, allowedTools: null, mcpConfigFile: null }),
       timeouts: { request_timeout_ms: 5000, idle_timeout_ms: 5000, probe_timeout_ms: 1000, process_kill_grace_ms: 100 },
     });
@@ -93,7 +93,7 @@ describe('POST /v1/chat/stream', () => {
     const app = express();
     app.use(express.json());
     const route = createStreamRoute({
-      getAdapter: () => undefined,
+      getModelEntry: () => undefined,
       resolveModeConfig: () => ({ systemPrompt: null, allowedTools: null, mcpConfigFile: null }),
       timeouts: { request_timeout_ms: 5000, idle_timeout_ms: 5000, probe_timeout_ms: 1000, process_kill_grace_ms: 100 },
     });
@@ -105,5 +105,37 @@ describe('POST /v1/chat/stream', () => {
 
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('unknown_model');
+  });
+
+  it('forwards entry.cliModel to adapter.send', async () => {
+    let receivedCliModel: string | null | undefined;
+    const adapter: ProviderAdapter = {
+      name: 'claude',
+      modelId: 'claude-code',
+      async probe() { return { status: 'ready' as const }; },
+      send(_msgs, _mode, _signal, cliModel) {
+        receivedCliModel = cliModel;
+        return {
+          events: (async function* () {
+            yield { type: 'start' as const, request_id: 'r', model: 'claude-opus', provider: 'claude' };
+            yield { type: 'done' as const };
+          })(),
+        };
+      },
+    };
+    const app = express();
+    app.use(express.json());
+    const route = createStreamRoute({
+      getModelEntry: () => ({ id: 'claude-opus', adapter, cliModel: 'opus', providerName: 'claude' }),
+      resolveModeConfig: () => ({ systemPrompt: null, allowedTools: null, mcpConfigFile: null }),
+      timeouts: { request_timeout_ms: 5000, idle_timeout_ms: 5000, probe_timeout_ms: 1000, process_kill_grace_ms: 100 },
+    });
+    app.post('/v1/chat/stream', (req, _res, next) => { (req as any).mode = 'agent'; next(); }, route);
+
+    await request(app)
+      .post('/v1/chat/stream')
+      .send({ model: 'claude-opus', mode: 'agent', messages: [{ role: 'user', content: 'hi' }] });
+
+    expect(receivedCliModel).toBe('opus');
   });
 });

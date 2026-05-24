@@ -1,13 +1,13 @@
 import type { Response } from 'express';
 import type { AuthedRequest } from '../middleware/auth.js';
-import type { ProviderAdapter } from '../providers/adapter.js';
+import type { ModelEntry } from '../providers/router.js';
 import type { ModeConfig } from '../modes/resolver.js';
 import type { ProxaiEvent } from '../events/schema.js';
 import type { ModeName } from '../config.js';
 import { withIdleTimeout } from '../lifecycle/children.js';
 
 export interface StreamRouteDeps {
-  getAdapter: (modelId: string) => ProviderAdapter | undefined;
+  getModelEntry: (modelId: string) => ModelEntry | undefined;
   resolveModeConfig: (mode: ModeName) => ModeConfig;
   timeouts: {
     request_timeout_ms: number;
@@ -30,25 +30,31 @@ export function createStreamRoute(deps: StreamRouteDeps) {
       res.status(400).json({ error: { code: 'invalid_messages', message: 'Missing or empty `messages`' } });
       return;
     }
-    const adapter = deps.getAdapter(model);
-    if (!adapter) {
+    const entry = deps.getModelEntry(model);
+    if (!entry) {
       res.status(400).json({ error: { code: 'unknown_model', message: `Unknown model: ${model}` } });
       return;
     }
 
     const abort = new AbortController();
     const requestTimeout = setTimeout(() => abort.abort(), deps.timeouts.request_timeout_ms);
-    req.on('close', () => abort.abort());
 
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders?.();
 
+    // Detect client disconnect via the response, not the request. In Node 18+/
+    // Express 5, `req` emits 'close' as soon as the request body is fully
+    // consumed (via express.json), which would abort the child immediately.
+    // `res.on('close')` fires only when the response is finished or the client
+    // socket actually closes mid-stream.
+    res.on('close', () => abort.abort());
+
     const heartbeat = setInterval(() => res.write(': keep-alive\n\n'), 15000);
 
     const modeConfig = deps.resolveModeConfig(mode);
-    const result = adapter.send(messages, modeConfig, abort.signal);
+    const result = entry.adapter.send(messages, modeConfig, abort.signal, entry.cliModel);
 
     try {
       for await (const ev of withIdleTimeout<ProxaiEvent>(result.events, deps.timeouts.idle_timeout_ms, 'idle_timeout')) {

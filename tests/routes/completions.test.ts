@@ -27,7 +27,7 @@ describe('POST /v1/chat/completions (OpenAI-compat)', () => {
     const app = express();
     app.use(express.json());
     const route = createCompletionsRoute({
-      getAdapter: () => new FakeAdapter(),
+      getModelEntry: () => ({ id: 'claude-code', adapter: new FakeAdapter(), cliModel: null, providerName: 'claude' }),
       resolveModeConfig: () => ({ systemPrompt: null, allowedTools: null, mcpConfigFile: null }),
       timeouts: { request_timeout_ms: 5000, idle_timeout_ms: 5000, probe_timeout_ms: 1000, process_kill_grace_ms: 100 },
     });
@@ -45,7 +45,7 @@ describe('POST /v1/chat/completions (OpenAI-compat)', () => {
     const app = express();
     app.use(express.json());
     const route = createCompletionsRoute({
-      getAdapter: () => new FakeAdapter(),
+      getModelEntry: () => ({ id: 'claude-code', adapter: new FakeAdapter(), cliModel: null, providerName: 'claude' }),
       resolveModeConfig: () => ({ systemPrompt: null, allowedTools: null, mcpConfigFile: null }),
       timeouts: { request_timeout_ms: 5000, idle_timeout_ms: 5000, probe_timeout_ms: 1000, process_kill_grace_ms: 100 },
     });
