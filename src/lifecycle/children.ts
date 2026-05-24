@@ -39,11 +39,16 @@ export async function* withIdleTimeout<T>(
   const it = source[Symbol.asyncIterator]();
   while (true) {
     const next = it.next();
-    const timer = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error(`${errorCode}: no event for ${idleMs}ms`)), idleMs),
-    );
-    const result = (await Promise.race([next, timer])) as IteratorResult<T>;
-    if (result.done) return;
-    yield result.value;
+    let handle: ReturnType<typeof setTimeout>;
+    const timer = new Promise<never>((_, reject) => {
+      handle = setTimeout(() => reject(new Error(`${errorCode}: no event for ${idleMs}ms`)), idleMs);
+    });
+    try {
+      const result = (await Promise.race([next, timer])) as IteratorResult<T>;
+      if (result.done) return;
+      yield result.value;
+    } finally {
+      clearTimeout(handle!);
+    }
   }
 }
